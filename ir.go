@@ -1160,16 +1160,6 @@ func NextParam(v Value) (rv Value)          { rv.C = C.LLVMGetNextParam(v.C); re
 func PrevParam(v Value) (rv Value)          { rv.C = C.LLVMGetPreviousParam(v.C); return }
 func (v Value) SetParamAlignment(align int) { C.LLVMSetParamAlignment(v.C, C.unsigned(align)) }
 
-func (v Value) FunctionType() (rt Type) {
-	rt.C = C.LLVMGoGetFunctionType(v.C)
-	return
-}
-
-func (v Value) ReturnType() (rt Type) {
-	rt.C = C.LLVMGoGetReturnType(v.C)
-	return
-}
-
 // Operations on basic blocks
 func (bb BasicBlock) AsValue() (v Value)      { v.C = C.LLVMBasicBlockAsValue(bb.C); return }
 func (v Value) IsBasicBlock() bool            { return C.LLVMValueIsBasicBlock(v.C) != 0 }
