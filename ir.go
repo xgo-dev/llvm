@@ -1225,9 +1225,14 @@ func InsertBasicBlock(ref BasicBlock, name string) (bb BasicBlock) {
 	bb.C = C.LLVMInsertBasicBlock(ref.C, cname)
 	return
 }
+func AppendExistingBasicBlock(f Value, bb BasicBlock) {
+	C.LLVMAppendExistingBasicBlock(f.C, bb.C)
+}
+
 func (bb BasicBlock) EraseFromParent()          { C.LLVMDeleteBasicBlock(bb.C) }
 func (bb BasicBlock) MoveBefore(pos BasicBlock) { C.LLVMMoveBasicBlockBefore(bb.C, pos.C) }
 func (bb BasicBlock) MoveAfter(pos BasicBlock)  { C.LLVMMoveBasicBlockAfter(bb.C, pos.C) }
+func (bb BasicBlock) RemoveFromParent()         { C.LLVMRemoveBasicBlockFromParent(bb.C) }
 
 // Operations on instructions
 func (v Value) EraseFromParentAsInstruction()      { C.LLVMInstructionEraseFromParent(v.C) }
