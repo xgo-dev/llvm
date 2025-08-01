@@ -1126,6 +1126,19 @@ func (v Value) RemoveEnumAttributeAtIndex(i int, kind uint) {
 func (v Value) RemoveEnumFunctionAttribute(kind uint) {
 	v.RemoveEnumAttributeAtIndex(C.LLVMAttributeFunctionIndex, kind)
 }
+func (v Value) GetFunctionAttributes() (attrs []Attribute) {
+	return v.GetAttributesAtIndex(C.LLVMAttributeFunctionIndex)
+}
+func (v Value) GetAttributesAtIndex(i int) (attrs []Attribute) {
+	n := C.LLVMGetAttributeCountAtIndex(v.C, C.LLVMAttributeIndex(i))
+	if n == 0 {
+		return
+	}
+	attrs = make([]Attribute, n)
+	C.LLVMGetAttributesAtIndex(v.C, C.LLVMAttributeIndex(i), &attrs[0].C)
+	return
+}
+
 func (v Value) RemoveStringAttributeAtIndex(i int, kind string) {
 	ckind := C.CString(kind)
 	defer C.free(unsafe.Pointer(ckind))
