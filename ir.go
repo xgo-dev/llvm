@@ -1126,6 +1126,19 @@ func (v Value) RemoveEnumAttributeAtIndex(i int, kind uint) {
 func (v Value) RemoveEnumFunctionAttribute(kind uint) {
 	v.RemoveEnumAttributeAtIndex(C.LLVMAttributeFunctionIndex, kind)
 }
+func (v Value) GetFunctionAttributes() (attrs []Attribute) {
+	return v.GetAttributesAtIndex(C.LLVMAttributeFunctionIndex)
+}
+func (v Value) GetAttributesAtIndex(i int) (attrs []Attribute) {
+	n := C.LLVMGetAttributeCountAtIndex(v.C, C.LLVMAttributeIndex(i))
+	if n == 0 {
+		return
+	}
+	attrs = make([]Attribute, n)
+	C.LLVMGetAttributesAtIndex(v.C, C.LLVMAttributeIndex(i), &attrs[0].C)
+	return
+}
+
 func (v Value) RemoveStringAttributeAtIndex(i int, kind string) {
 	ckind := C.CString(kind)
 	defer C.free(unsafe.Pointer(ckind))
@@ -1159,16 +1172,6 @@ func (v Value) LastParam() (rv Value)       { rv.C = C.LLVMGetLastParam(v.C); re
 func NextParam(v Value) (rv Value)          { rv.C = C.LLVMGetNextParam(v.C); return }
 func PrevParam(v Value) (rv Value)          { rv.C = C.LLVMGetPreviousParam(v.C); return }
 func (v Value) SetParamAlignment(align int) { C.LLVMSetParamAlignment(v.C, C.unsigned(align)) }
-
-func (v Value) FunctionType() (rt Type) {
-	rt.C = C.LLVMGoGetFunctionType(v.C)
-	return
-}
-
-func (v Value) ReturnType() (rt Type) {
-	rt.C = C.LLVMGoGetReturnType(v.C)
-	return
-}
 
 // Operations on basic blocks
 func (bb BasicBlock) AsValue() (v Value)      { v.C = C.LLVMBasicBlockAsValue(bb.C); return }
@@ -1225,9 +1228,14 @@ func InsertBasicBlock(ref BasicBlock, name string) (bb BasicBlock) {
 	bb.C = C.LLVMInsertBasicBlock(ref.C, cname)
 	return
 }
+func AppendExistingBasicBlock(f Value, bb BasicBlock) {
+	C.LLVMAppendExistingBasicBlock(f.C, bb.C)
+}
+
 func (bb BasicBlock) EraseFromParent()          { C.LLVMDeleteBasicBlock(bb.C) }
 func (bb BasicBlock) MoveBefore(pos BasicBlock) { C.LLVMMoveBasicBlockBefore(bb.C, pos.C) }
 func (bb BasicBlock) MoveAfter(pos BasicBlock)  { C.LLVMMoveBasicBlockAfter(bb.C, pos.C) }
+func (bb BasicBlock) RemoveFromParent()         { C.LLVMRemoveBasicBlockFromParent(bb.C) }
 
 // Operations on instructions
 func (v Value) EraseFromParentAsInstruction()      { C.LLVMInstructionEraseFromParent(v.C) }

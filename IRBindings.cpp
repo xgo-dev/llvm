@@ -85,13 +85,3 @@ LLVMValueRef LLVMGoGetInlineAsm(LLVMTypeRef Ty, char *AsmString,
                           IsAlignStack,
                           Dialect, CanThrow);
 }
-
-LLVMTypeRef LLVMGoGetFunctionType(LLVMValueRef Value)
-{
-  return wrap(unwrap<Function>(Value)->getFunctionType());
-}
-
-LLVMTypeRef LLVMGoGetReturnType(LLVMValueRef Value)
-{
-  return wrap(unwrap<Function>(Value)->getReturnType());
-}
