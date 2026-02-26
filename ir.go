@@ -71,6 +71,7 @@ type (
 	AtomicOrdering      C.LLVMAtomicOrdering
 	TypeKind            C.LLVMTypeKind
 	Linkage             C.LLVMLinkage
+	DLLStorageClass     C.LLVMDLLStorageClass
 	Visibility          C.LLVMVisibility
 	CallConv            C.LLVMCallConv
 	ComdatSelectionKind C.LLVMComdatSelectionKind
@@ -250,6 +251,16 @@ const (
 	VectorTypeKind    TypeKind = C.LLVMVectorTypeKind
 	MetadataTypeKind  TypeKind = C.LLVMMetadataTypeKind
 	TokenTypeKind     TypeKind = C.LLVMTokenTypeKind
+)
+
+//-------------------------------------------------------------------------
+// llvm.DLLStorageClass
+//-------------------------------------------------------------------------
+
+const (
+	DefaultStorageClass   DLLStorageClass = C.LLVMDefaultStorageClass
+	DLLImportStorageClass DLLStorageClass = C.LLVMDLLImportStorageClass
+	DLLExportStorageClass DLLStorageClass = C.LLVMDLLExportStorageClass
 )
 
 //-------------------------------------------------------------------------
@@ -975,7 +986,13 @@ func (v Value) GlobalParent() (m Module) { m.C = C.LLVMGetGlobalParent(v.C); ret
 func (v Value) IsDeclaration() bool      { return C.LLVMIsDeclaration(v.C) != 0 }
 func (v Value) Linkage() Linkage         { return Linkage(C.LLVMGetLinkage(v.C)) }
 func (v Value) SetLinkage(l Linkage)     { C.LLVMSetLinkage(v.C, C.LLVMLinkage(l)) }
-func (v Value) Section() string          { return C.GoString(C.LLVMGetSection(v.C)) }
+func (v Value) DLLStorageClass() DLLStorageClass {
+	return DLLStorageClass(C.LLVMGetDLLStorageClass(v.C))
+}
+func (v Value) SetDLLStorageClass(c DLLStorageClass) {
+	C.LLVMSetDLLStorageClass(v.C, C.LLVMDLLStorageClass(c))
+}
+func (v Value) Section() string { return C.GoString(C.LLVMGetSection(v.C)) }
 func (v Value) SetSection(str string) {
 	cstr := C.CString(str)
 	defer C.free(unsafe.Pointer(cstr))
