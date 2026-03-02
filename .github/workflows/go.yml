@@ -10,7 +10,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        llvm: [14, 15, 16, 17, 18, 19, 20]
+        llvm: [14, 15, 16, 17, 18, 19, 20, 21]
         go-version: [1.18.x, 1.21.x, 1.22.x]
     steps:
       - name: Checkout
@@ -24,7 +24,7 @@ jobs:
       #  run: brew update
       # Optional step when a LLVM version is very new.
       - name: Update Homebrew
-        if: matrix.llvm == 20
+        if: matrix.llvm == 21
         run: brew update
       - name: Install LLVM
         run: HOMEBREW_NO_AUTO_UPDATE=1 brew install llvm@${{ matrix.llvm }}
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        llvm: [14, 15, 16, 17, 18, 19, 20]
+        llvm: [14, 15, 16, 17, 18, 19, 20, 21]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
