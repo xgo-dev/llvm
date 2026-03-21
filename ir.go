@@ -577,6 +577,8 @@ func (c Context) X86FP80Type() (t Type)  { t.C = C.LLVMX86FP80TypeInContext(c.C)
 func (c Context) FP128Type() (t Type)    { t.C = C.LLVMFP128TypeInContext(c.C); return }
 func (c Context) PPCFP128Type() (t Type) { t.C = C.LLVMPPCFP128TypeInContext(c.C); return }
 
+func (c Context) MetadataType() (t Type) { t.C = C.LLVMMetadataTypeInContext(c.C); return }
+
 // Operations on function types
 func FunctionType(returnType Type, paramTypes []Type, isVarArg bool) (t Type) {
 	var pt *C.LLVMTypeRef
@@ -826,6 +828,10 @@ func (c Context) MDNode(mds []Metadata) (md Metadata) {
 }
 func (v Value) ConstantAsMetadata() (md Metadata) {
 	md.C = C.LLVMConstantAsMetadata(v.C)
+	return
+}
+func (c Context) MetadataAsValue(md Metadata) (v Value) {
+	v.C = C.LLVMMetadataAsValue(c.C, md.C)
 	return
 }
 
