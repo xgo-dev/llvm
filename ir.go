@@ -528,12 +528,12 @@ func (m Module) NamedMetadataNumOperands(name string) int {
 	return int(C.LLVMGetNamedMetadataNumOperands(m.C, cname))
 }
 func (m Module) NamedMetadataOperands(name string) []Value {
-	n := m.NamedMetadataNumOperands(name)
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	n := int(C.LLVMGetNamedMetadataNumOperands(m.C, cname))
 	if n == 0 {
 		return nil
 	}
-	cname := C.CString(name)
-	defer C.free(unsafe.Pointer(cname))
 	values := make([]Value, n)
 	C.LLVMGetNamedMetadataOperands(m.C, cname, llvmValueRefPtr(&values[0]))
 	return values
