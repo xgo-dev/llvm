@@ -522,6 +522,22 @@ func (m Module) AddNamedMetadataOperand(name string, operand Metadata) {
 	defer C.free(unsafe.Pointer(cname))
 	C.LLVMAddNamedMetadataOperand2(m.C, cname, operand.C)
 }
+func (m Module) NamedMetadataNumOperands(name string) int {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	return int(C.LLVMGetNamedMetadataNumOperands(m.C, cname))
+}
+func (m Module) NamedMetadataOperands(name string) []Value {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	n := int(C.LLVMGetNamedMetadataNumOperands(m.C, cname))
+	if n == 0 {
+		return nil
+	}
+	values := make([]Value, n)
+	C.LLVMGetNamedMetadataOperands(m.C, cname, llvmValueRefPtr(&values[0]))
+	return values
+}
 
 func (m Module) Context() (c Context) {
 	c.C = C.LLVMGetModuleContext(m.C)
@@ -823,6 +839,26 @@ func (c Context) MDNode(mds []Metadata) (md Metadata) {
 	ptr, nvals := llvmMetadataRefs(mds)
 	md.C = C.LLVMMDNode2(c.C, ptr, nvals)
 	return
+}
+func (v Value) MDNodeNumOperands() int {
+	return int(C.LLVMGetMDNodeNumOperands(v.C))
+}
+func (v Value) MDNodeOperands() []Value {
+	n := v.MDNodeNumOperands()
+	if n == 0 {
+		return nil
+	}
+	values := make([]Value, n)
+	C.LLVMGetMDNodeOperands(v.C, llvmValueRefPtr(&values[0]))
+	return values
+}
+func (v Value) IsAMDString() bool {
+	return C.LLVMIsAMDString(v.C) != nil
+}
+func (v Value) MDString() string {
+	var n C.unsigned
+	s := C.LLVMGetMDString(v.C, &n)
+	return C.GoStringN(s, C.int(n))
 }
 func (v Value) ConstantAsMetadata() (md Metadata) {
 	md.C = C.LLVMConstantAsMetadata(v.C)
