@@ -16,6 +16,7 @@ package llvm
 #include "llvm-c/Core.h"
 #include "llvm-c/Target.h"
 #include "llvm-c/TargetMachine.h"
+#include "TargetBindings.h"
 #include <stdlib.h>
 */
 import "C"
@@ -40,6 +41,17 @@ type (
 	CodeGenFileType C.LLVMCodeGenFileType
 	CodeModel       C.LLVMCodeModel
 )
+
+// TargetMachineOptions contains explicit llvm::TargetOptions flags exposed by
+// CreateTargetMachineWithOptions.
+type TargetMachineOptions struct {
+	// FunctionSections places each function in its own section.
+	FunctionSections bool
+	// DataSections places each data object in its own section.
+	DataSections bool
+	// UniqueSectionNames qualifies section names with symbol names.
+	UniqueSectionNames bool
+}
 
 const (
 	BigEndian    ByteOrdering = C.LLVMBigEndian
@@ -254,6 +266,43 @@ func (t Target) CreateTargetMachine(Triple string, CPU string, Features string,
 		C.LLVMRelocMode(Reloc),
 		C.LLVMCodeModel(CodeModel))
 	return
+}
+
+// CreateTargetMachineWithOptions creates a new TargetMachine with explicit
+// llvm::TargetOptions flags that are not exposed by the LLVM C API.
+// Use CreateTargetMachine if you do not need to override TargetOptions fields
+// that are absent from the LLVM C API.
+func (t Target) CreateTargetMachineWithOptions(Triple string, CPU string, Features string,
+	Level CodeGenOptLevel, Reloc RelocMode,
+	CodeModel CodeModel, opts TargetMachineOptions) (tm TargetMachine) {
+	cTriple := C.CString(Triple)
+	defer C.free(unsafe.Pointer(cTriple))
+	cCPU := C.CString(CPU)
+	defer C.free(unsafe.Pointer(cCPU))
+	cFeatures := C.CString(Features)
+	defer C.free(unsafe.Pointer(cFeatures))
+
+	tm.C = C.LLVMGoCreateTargetMachineWithOptions(
+		t.C,
+		cTriple,
+		cCPU,
+		cFeatures,
+		C.LLVMCodeGenOptLevel(Level),
+		C.LLVMRelocMode(Reloc),
+		C.LLVMCodeModel(CodeModel),
+		boolToLLVMBool(opts.FunctionSections),
+		boolToLLVMBool(opts.DataSections),
+		boolToLLVMBool(opts.UniqueSectionNames),
+	)
+	return
+}
+
+func (tm TargetMachine) sectionOptions() TargetMachineOptions {
+	return TargetMachineOptions{
+		FunctionSections:   C.LLVMGoTargetMachineFunctionSections(tm.C) != 0,
+		DataSections:       C.LLVMGoTargetMachineDataSections(tm.C) != 0,
+		UniqueSectionNames: C.LLVMGoTargetMachineUniqueSectionNames(tm.C) != 0,
+	}
 }
 
 // CreateTargetData returns a new TargetData describing the TargetMachine's
