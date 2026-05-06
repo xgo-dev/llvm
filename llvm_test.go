@@ -3,7 +3,7 @@ package llvm_test
 import (
 	"testing"
 
-	"github.com/goplus/llvm"
+	"github.com/xgo-dev/llvm"
 )
 
 // Dummy test function.
