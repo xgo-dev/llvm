@@ -1,5 +1,8 @@
 
 #include "backports.h"
+#include "llvm/Analysis/ModuleSummaryAnalysis.h"
+#include "llvm/Analysis/ProfileSummaryInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Instructions.h"
 #if LLVM_VERSION_MAJOR >= 16
 #include "llvm/IR/PassManager.h"
@@ -46,6 +49,19 @@ LLVMMemoryBufferRef LLVMGoWriteThinLTOBitcodeToMemoryBuffer(LLVMModuleRef M) {
   PM.add(createWriteThinLTOBitcodePass(OS));
   PM.run(*llvm::unwrap(M));
 #endif
+  return llvm::wrap(llvm::MemoryBuffer::getMemBufferCopy(OS.str()).release());
+}
+
+LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(LLVMModuleRef M) {
+  std::string Data;
+  llvm::raw_string_ostream OS(Data);
+  llvm::Module *Mod = llvm::unwrap(M);
+  Mod->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
+  llvm::ProfileSummaryInfo PSI(*Mod);
+  llvm::ModuleSummaryIndex Index =
+      llvm::buildModuleSummaryIndex(*Mod, nullptr, &PSI);
+  Index.setEnableSplitLTOUnit();
+  llvm::WriteBitcodeToFile(*Mod, OS, false, &Index, false);
   return llvm::wrap(llvm::MemoryBuffer::getMemBufferCopy(OS.str()).release());
 }
 
