@@ -13,7 +13,7 @@ func TestWriteFullLTOBitcodeToMemoryBufferAddsFullLTOFlag(t *testing.T) {
 	fnTy := FunctionType(ctx.Int32Type(), nil, false)
 	AddFunction(mod, "main", fnTy)
 
-	buf := WriteFullLTOBitcodeToMemoryBuffer(mod)
+	buf := WriteFullLTOBitcodeToMemoryBuffer(mod, true)
 	defer buf.Dispose()
 	if buf.IsNil() {
 		t.Fatal("WriteFullLTOBitcodeToMemoryBuffer returned nil buffer")

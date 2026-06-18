@@ -10,7 +10,8 @@ void LLVMGlobalObjectAddMetadata(LLVMValueRef objValue, unsigned KindID, LLVMMet
 
 LLVMMemoryBufferRef LLVMGoWriteThinLTOBitcodeToMemoryBuffer(LLVMModuleRef M);
 
-LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(LLVMModuleRef M);
+LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(
+    LLVMModuleRef M, LLVMBool EnableSplitLTOUnit);
 
 void LLVMGoDIBuilderInsertDbgValueRecordAtEnd(
     LLVMDIBuilderRef Builder, LLVMValueRef Val, LLVMMetadataRef VarInfo,

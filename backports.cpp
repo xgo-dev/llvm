@@ -52,7 +52,8 @@ LLVMMemoryBufferRef LLVMGoWriteThinLTOBitcodeToMemoryBuffer(LLVMModuleRef M) {
   return llvm::wrap(llvm::MemoryBuffer::getMemBufferCopy(OS.str()).release());
 }
 
-LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(LLVMModuleRef M) {
+LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(
+    LLVMModuleRef M, LLVMBool EnableSplitLTOUnit) {
   std::string Data;
   llvm::raw_string_ostream OS(Data);
   llvm::Module *Mod = llvm::unwrap(M);
@@ -60,7 +61,8 @@ LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(LLVMModuleRef M) {
   llvm::ProfileSummaryInfo PSI(*Mod);
   llvm::ModuleSummaryIndex Index =
       llvm::buildModuleSummaryIndex(*Mod, nullptr, &PSI);
-  Index.setEnableSplitLTOUnit();
+  if (EnableSplitLTOUnit)
+    Index.setEnableSplitLTOUnit();
   llvm::WriteBitcodeToFile(*Mod, OS, false, &Index, false);
   return llvm::wrap(llvm::MemoryBuffer::getMemBufferCopy(OS.str()).release());
 }
