@@ -36,8 +36,8 @@ func WriteBitcodeToMemoryBuffer(m Module) MemoryBuffer {
 	return MemoryBuffer{mb}
 }
 
-func WriteFullLTOBitcodeToMemoryBuffer(m Module) MemoryBuffer {
-	mb := C.LLVMGoWriteFullLTOBitcodeToMemoryBuffer(m.C)
+func WriteFullLTOBitcodeToMemoryBuffer(m Module, enableSplitLTOUnit bool) MemoryBuffer {
+	mb := C.LLVMGoWriteFullLTOBitcodeToMemoryBuffer(m.C, boolToLLVMBool(enableSplitLTOUnit))
 	return MemoryBuffer{mb}
 }
 
