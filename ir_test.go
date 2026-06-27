@@ -167,8 +167,8 @@ func TestIntrinsicBindings(t *testing.T) {
 		ConstInt(ctx.Int1Type(), 0, false),
 	}, "")
 	builder.CreateRetVoid()
-	if got := call.CalledValue().Name(); got != "llvm.memset.p0.i64" {
-		t.Fatalf("got intrinsic callee %q, want llvm.memset.p0.i64", got)
+	if got := call.CalledValue().IntrinsicID(); got != memsetID {
+		t.Fatalf("got intrinsic ID %d, want %d", got, memsetID)
 	}
 	if err := VerifyModule(mod, ReturnStatusAction); err != nil {
 		t.Fatalf("module with intrinsic call should verify: %v", err)

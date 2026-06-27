@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRBindings.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -90,7 +91,23 @@ LLVMValueRef LLVMGoGetInlineAsm(LLVMTypeRef Ty, char *AsmString,
 LLVMValueRef LLVMGoBuildIntrinsicCall(LLVMBuilderRef B, LLVMTypeRef RetTy,
                                       unsigned ID, LLVMValueRef *Args,
                                       unsigned Count, const char *Name) {
-  return wrap(unwrap(B)->CreateIntrinsic(
-      unwrap(RetTy), static_cast<Intrinsic::ID>(ID),
-      ArrayRef<Value *>(unwrap(Args), Count), nullptr, Name));
+  Intrinsic::ID IntrinsicID = static_cast<Intrinsic::ID>(ID);
+  ArrayRef<Value *> UnwrappedArgs(unwrap(Args), Count);
+  SmallVector<Type *, 8> ParamTys;
+  SmallVector<Type *, 8> OverloadTys;
+  SmallVector<Intrinsic::IITDescriptor, 8> Infos;
+
+  ParamTys.reserve(Count);
+  for (Value *Arg : UnwrappedArgs)
+    ParamTys.push_back(Arg->getType());
+
+  FunctionType *FTy = FunctionType::get(unwrap(RetTy), ParamTys, false);
+  Intrinsic::getIntrinsicInfoTableEntries(IntrinsicID, Infos);
+  ArrayRef<Intrinsic::IITDescriptor> InfoRef(Infos);
+  if (Intrinsic::matchIntrinsicSignature(FTy, InfoRef, OverloadTys) !=
+      Intrinsic::MatchIntrinsicTypes_Match)
+    return nullptr;
+
+  return wrap(unwrap(B)->CreateIntrinsic(IntrinsicID, OverloadTys,
+                                         UnwrappedArgs, nullptr, Name));
 }
