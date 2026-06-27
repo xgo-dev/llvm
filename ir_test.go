@@ -145,6 +145,36 @@ func TestDebugLoc(t *testing.T) {
 	}
 }
 
+func TestIntrinsicBindings(t *testing.T) {
+	ctx := NewContext()
+	mod := ctx.NewModule("")
+	defer mod.Dispose()
+
+	memsetID := LookupIntrinsicID("llvm.memset")
+	if memsetID == 0 {
+		t.Fatal("could not look up llvm.memset intrinsic")
+	}
+	ptrTy := PointerType(ctx.Int8Type(), 0)
+	fnTy := FunctionType(ctx.VoidType(), []Type{ptrTy}, false)
+	fn := AddFunction(mod, "use_memset", fnTy)
+	builder := ctx.NewBuilder()
+	defer builder.Dispose()
+	builder.SetInsertPointAtEnd(ctx.AddBasicBlock(fn, "entry"))
+	call := builder.CreateIntrinsic(ctx.VoidType(), memsetID, []Value{
+		fn.Param(0),
+		ConstInt(ctx.Int8Type(), 0, false),
+		ConstInt(ctx.Int64Type(), 8, false),
+		ConstInt(ctx.Int1Type(), 0, false),
+	}, "")
+	builder.CreateRetVoid()
+	if got := call.CalledValue().IntrinsicID(); got != memsetID {
+		t.Fatalf("got intrinsic ID %d, want %d", got, memsetID)
+	}
+	if err := VerifyModule(mod, ReturnStatusAction); err != nil {
+		t.Fatalf("module with intrinsic call should verify: %v", err)
+	}
+}
+
 func TestSubtypes(t *testing.T) {
 	cont := NewContext()
 	defer cont.Dispose()

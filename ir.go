@@ -385,6 +385,13 @@ func MDKindID(name string) (id int) {
 	return
 }
 
+func LookupIntrinsicID(name string) (id int) {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	id = int(C.LLVMLookupIntrinsicID(cname, C.size_t(len(name))))
+	return
+}
+
 //-------------------------------------------------------------------------
 // llvm.Attribute
 //-------------------------------------------------------------------------
@@ -1952,6 +1959,14 @@ func (b Builder) CreateCall(t Type, fn Value, args []Value, name string) (v Valu
 	defer C.free(unsafe.Pointer(cname))
 	ptr, nvals := llvmValueRefs(args)
 	v.C = C.LLVMBuildCall2(b.C, t.C, fn.C, ptr, nvals, cname)
+	return
+}
+
+func (b Builder) CreateIntrinsic(ret Type, id int, args []Value, name string) (v Value) {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	ptr, nvals := llvmValueRefs(args)
+	v.C = C.LLVMGoBuildIntrinsicCall(b.C, ret.C, C.unsigned(id), ptr, nvals, cname)
 	return
 }
 

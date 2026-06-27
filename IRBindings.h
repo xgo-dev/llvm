@@ -55,6 +55,10 @@ LLVMValueRef LLVMGoGetInlineAsm(LLVMTypeRef Ty, char *AsmString,
                                 LLVMBool IsAlignStack,
                                 LLVMInlineAsmDialect Dialect, LLVMBool CanThrow);
 
+LLVMValueRef LLVMGoBuildIntrinsicCall(LLVMBuilderRef B, LLVMTypeRef RetTy,
+                                      unsigned ID, LLVMValueRef *Args,
+                                      unsigned Count, const char *Name);
+
 #ifdef __cplusplus
 }
 #endif
