@@ -16,6 +16,7 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 
@@ -84,4 +85,12 @@ LLVMValueRef LLVMGoGetInlineAsm(LLVMTypeRef Ty, char *AsmString,
                           ConstraintsSize, HasSideEffects,
                           IsAlignStack,
                           Dialect, CanThrow);
+}
+
+LLVMValueRef LLVMGoBuildIntrinsicCall(LLVMBuilderRef B, LLVMTypeRef RetTy,
+                                      unsigned ID, LLVMValueRef *Args,
+                                      unsigned Count, const char *Name) {
+  return wrap(unwrap(B)->CreateIntrinsic(
+      unwrap(RetTy), static_cast<Intrinsic::ID>(ID),
+      ArrayRef<Value *>(unwrap(Args), Count), nullptr, Name));
 }
