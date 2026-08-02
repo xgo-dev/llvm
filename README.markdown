@@ -1,7 +1,6 @@
 # Go bindings to system LLVM
 
 [![Build Status](https://github.com/xgo-dev/llvm/actions/workflows/go.yml/badge.svg)](https://github.com/xgo-dev/llvm/actions/workflows/go.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/xgo-dev/llvm)](https://goreportcard.com/report/github.com/xgo-dev/llvm)
 [![GoDoc](https://pkg.go.dev/badge/github.com/xgo-dev/llvm.svg)](https://pkg.go.dev/github.com/xgo-dev/llvm)
 <!--
 [![GitHub release](https://img.shields.io/github/v/tag/goplus/llvm.svg?label=release)](https://github.com/xgo-dev/llvm/releases)
