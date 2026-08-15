@@ -16,8 +16,8 @@ Currently supported:
   * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 in an MSYS2 MINGW64 environment on Windows (see the setup below).
   * Any of the above versions with a manually built LLVM through the `byollvm` build tag. You need to set up `CFLAGS`/`LDFLAGS` etc yourself in this case.
 
-You can select the LLVM version using a build tag, for example `-tags=llvm17`
-to use LLVM 17.
+LLVM 21 is selected by default. You can select another LLVM version using a
+build tag, for example `-tags=llvm19` to use LLVM 19.
 
 ## Usage
 
