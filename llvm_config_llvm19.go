@@ -15,7 +15,7 @@ package llvm
 // #cgo linux        CPPFLAGS: -I/usr/include/llvm-19 -I/usr/include/llvm-c-19 -I/usr/lib64/llvm19/include -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
 // #cgo linux        CXXFLAGS: -std=c++17
 // #cgo linux        LDFLAGS: -L/usr/lib/llvm-19/lib -L/usr/lib64/llvm19/lib -lLLVM-19
-// #cgo windows      pkg-config: llgo-llvm-19
+// #cgo windows      pkg-config: llvm-19
 // #cgo windows      CXXFLAGS: -std=c++17
 import "C"
 

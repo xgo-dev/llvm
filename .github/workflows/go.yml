@@ -134,17 +134,17 @@ jobs:
 
           # The Windows binding keeps LLVM's host flags package-local through
           # pkg-config, so they do not affect unrelated CGO packages.
-          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llgo-llvm-pkgconfig"
+          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
           mkdir -p "$pc_dir"
           cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
           ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ')"
           printf '%s\n' \
-            'Name: LLGo LLVM 19 host' \
-            'Description: LLVM 19 flags used by the LLGo host compiler' \
+            'Name: LLVM 19' \
+            'Description: LLVM 19 host compiler and linker flags' \
             "Version: $llvm_version" \
             "Cflags: $cflags" \
             "Libs: $ldflags" \
-            > "$pc_dir/llgo-llvm-19.pc"
+            > "$pc_dir/llvm-19.pc"
 
           export CC=clang
           export CXX=clang++
@@ -159,7 +159,7 @@ jobs:
           export CC=clang
           export CXX=clang++
           export CGO_ENABLED=1
-          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llgo-llvm-pkgconfig"
+          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
           export PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
           go test -v
   test-linux-fedora:
