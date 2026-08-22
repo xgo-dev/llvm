@@ -10,6 +10,7 @@ package llvm
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +75,7 @@ func TestWriteArchiveRejectsInvalidMembers(t *testing.T) {
 		{name: "empty path", members: []ArchiveMember{{}}, want: "archive path is empty"},
 		{name: "no members", path: path, want: "archive has no members"},
 		{name: "empty member", path: path, members: []ArchiveMember{{}}, want: "has no file or memory buffer"},
-		{name: "missing file", path: path, members: []ArchiveMember{NewArchiveMemberFromFile(missing)}, want: missing},
+		{name: "missing file", path: path, members: []ArchiveMember{NewArchiveMemberFromFile(missing)}, want: fmt.Sprintf("%q", missing)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
