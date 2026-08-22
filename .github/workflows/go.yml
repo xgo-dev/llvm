@@ -55,6 +55,113 @@ jobs:
         if: matrix.llvm == 19
         run:
           go test -v
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          path-type: inherit
+          update: true
+      - name: Install LLVM 19
+        shell: msys2 {0}
+        env:
+          LLVM_VERSION: '19.1.7'
+          MSYS2_LLVM_PACKAGE_VERSION: '19.1.7-1'
+        run: |
+          set -euo pipefail
+
+          repo=https://repo.msys2.org/mingw/clang64
+          prefix=mingw-w64-clang-x86_64
+          packages=(
+            "clang-$MSYS2_LLVM_PACKAGE_VERSION"
+            "clang-libs-$MSYS2_LLVM_PACKAGE_VERSION"
+            "compiler-rt-$MSYS2_LLVM_PACKAGE_VERSION"
+            "llvm-$MSYS2_LLVM_PACKAGE_VERSION"
+            "llvm-libs-$MSYS2_LLVM_PACKAGE_VERSION"
+            "lld-$MSYS2_LLVM_PACKAGE_VERSION"
+            "libc++-$MSYS2_LLVM_PACKAGE_VERSION"
+            "libunwind-$MSYS2_LLVM_PACKAGE_VERSION"
+            'gettext-runtime-0.22.5-2'
+            'libffi-3.4.6-1'
+            'libiconv-1.17-4'
+            'libxml2-2.12.9-2'
+            'xz-5.6.3-3'
+            'zlib-1.3.1-1'
+            'zstd-1.5.6-2'
+          )
+          urls=()
+          for package in "${packages[@]}"; do
+            urls+=("$repo/$prefix-$package-any.pkg.tar.zst")
+          done
+
+          # These archived LLVM 19 packages predate MSYS2's rename of the
+          # compiler-runtime virtual dependency from gcc-libs to cc-libs.
+          # libc++ 19 still supplies that runtime, so satisfy only the renamed
+          # package metadata rather than upgrading the pinned LLVM toolchain.
+          assumed_cc_runtime="$prefix-cc-libs=$LLVM_VERSION"
+          pacman --noconfirm -U \
+            --assume-installed "$assumed_cc_runtime" \
+            "${urls[@]}"
+          pacman --noconfirm -S --needed \
+            --assume-installed "$assumed_cc_runtime" \
+            "$prefix-pkgconf"
+
+          for package in clang clang-libs compiler-rt llvm llvm-libs lld libc++ libunwind; do
+            installed="$(pacman -Q "$prefix-$package" | awk '{print $2}')"
+            if [[ "$installed" != "$MSYS2_LLVM_PACKAGE_VERSION" ]]; then
+              echo "expected $package $MSYS2_LLVM_PACKAGE_VERSION, got $installed" >&2
+              exit 1
+            fi
+          done
+      - name: Test LLVM 19
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+
+          llvm_version="$(llvm-config --version)"
+          if [[ "$llvm_version" != 19.1.7 ]]; then
+            echo "expected LLVM 19.1.7, got $llvm_version" >&2
+            exit 1
+          fi
+
+          # The Windows binding keeps LLVM's host flags package-local through
+          # pkg-config, so they do not affect unrelated CGO packages.
+          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llgo-llvm-pkgconfig"
+          mkdir -p "$pc_dir"
+          cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
+          ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ')"
+          printf '%s\n' \
+            'Name: LLGo LLVM 19 host' \
+            'Description: LLVM 19 flags used by the LLGo host compiler' \
+            "Version: $llvm_version" \
+            "Cflags: $cflags" \
+            "Libs: $ldflags" \
+            > "$pc_dir/llgo-llvm-19.pc"
+
+          export CC=clang
+          export CXX=clang++
+          export CGO_ENABLED=1
+          export PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          clang --version
+          go test -v -tags=llvm19
+      - name: Test default LLVM
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          export CC=clang
+          export CXX=clang++
+          export CGO_ENABLED=1
+          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llgo-llvm-pkgconfig"
+          export PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          go test -v
   test-linux-fedora:
     # Fedora uses different paths than other systems, so testing it separately.
     runs-on: ubuntu-24.04
