@@ -55,6 +55,133 @@ jobs:
         if: matrix.llvm == 19
         run:
           go test -v
+  test-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - llvm: 14
+            version: '14.0.6'
+            sha256: a46a843b0899d284f2a1c76e15aa9a6f3e939925ed008fd4b3b68c5f2f0c8231
+          - llvm: 15
+            version: '15.0.7'
+            sha256: 8c55ba91a041507bd927c5f82348c36ef3696485afb71c51bbcc35a014d179de
+          - llvm: 16
+            version: '16.0.6'
+            sha256: 8082a28d7ff50e5dfdace530935e3e59c37d11f1f8b52f43b7dc3b2fa130be66
+          - llvm: 17
+            version: '17.0.6'
+            sha256: 773f122cd79a54ecf3cbf1b1aff47543e95b12b4f91278b29c70cade37e3018c
+          - llvm: 18
+            version: '18.1.8'
+            sha256: 7cb37bafd78874e707d0c323f8e16e81503bc76867638ef1c634ee0451fac0be
+          - llvm: 19
+            version: '19.1.7'
+            sha256: d39689f23e1143a710a9120741ac3a1621fc4e2a81a143959bc870c60f9b85d1
+          - llvm: 20
+            version: '20.1.8'
+            sha256: 0944367aff9c3619f98dd0db78a1489018af9a8501b2533d17cc143a9624d853
+          - llvm: 21
+            version: '21.1.4'
+            sha256: f18f364b3aea5e4d09a4ed58d1c34b7220883912662e39935af96fabd603a912
+          - llvm: 22
+            version: '22.1.0'
+            sha256: 00199342f0cedfae60421d5d4ce0f1e217a06d7617611c8541372c47269c7084
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-pkgconf
+      - name: Install LLVM ${{ matrix.llvm }}
+        shell: pwsh
+        run: |
+          $archiveName = 'llvm-${{ matrix.version }}-windows-gnu.zip'
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $url = "https://github.com/yasuo-ozu/llvm-full/releases/download/v${{ matrix.version }}/$archiveName"
+          curl.exe --fail --location --retry 3 --output $archive $url
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to download $url"
+          }
+
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne '${{ matrix.sha256 }}') {
+            throw "expected SHA-256 ${{ matrix.sha256 }}, got $actualSha256"
+          }
+
+          $prefix = Join-Path $env:RUNNER_TEMP 'llvm-${{ matrix.version }}'
+          New-Item -ItemType Directory -Force -Path $prefix | Out-Null
+          7z x $archive "-o$prefix" -y
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to extract $archive"
+          }
+          Remove-Item $archive
+
+          if (-not (Test-Path (Join-Path $prefix 'bin\llvm-config.exe'))) {
+            throw "llvm-config.exe is missing from $prefix"
+          }
+          "LLVM_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Test LLVM ${{ matrix.llvm }}
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+
+          llvm_bin="$(cygpath -u "$LLVM_PREFIX")/bin"
+          export PATH="$llvm_bin:$PATH"
+          llvm_version="$(llvm-config --version)"
+          if [[ "$llvm_version" != '${{ matrix.version }}' ]]; then
+            echo "expected LLVM ${{ matrix.version }}, got $llvm_version" >&2
+            exit 1
+          fi
+
+          # Supply the installed LLVM's include and library paths through the
+          # versioned pkg-config name consumed by the Windows binding.
+          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
+          mkdir -p "$pc_dir"
+          cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
+          # The release archives can embed their build machine's zstd import
+          # library path, and their static LLVM libraries require winpthread.
+          ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ' | sed -E 's#[^[:space:]]*/mingw64/lib/libzstd\.dll\.a#-lzstd#g') -lwinpthread"
+          printf '%s\n' \
+            'Name: LLVM ${{ matrix.llvm }}' \
+            'Description: LLVM ${{ matrix.llvm }} host compiler and linker flags' \
+            "Version: $llvm_version" \
+            "Cflags: $cflags" \
+            "Libs: $ldflags" \
+            > "$pc_dir/llvm-${{ matrix.llvm }}.pc"
+
+          export CC=gcc
+          export CXX=g++
+          export CGO_ENABLED=1
+          PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          export PKG_CONFIG_PATH
+          gcc --version
+          go test -v -tags=llvm${{ matrix.llvm }}
+      - name: Test default LLVM
+        if: matrix.llvm == 19
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          llvm_bin="$(cygpath -u "$LLVM_PREFIX")/bin"
+          export PATH="$llvm_bin:$PATH"
+          export CC=gcc
+          export CXX=g++
+          export CGO_ENABLED=1
+          pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
+          PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          export PKG_CONFIG_PATH
+          go test -v
   test-linux-fedora:
     # Fedora uses different paths than other systems, so testing it separately.
     runs-on: ubuntu-24.04
