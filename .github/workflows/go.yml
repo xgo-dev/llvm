@@ -57,6 +57,37 @@ jobs:
           go test -v
   test-windows:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - llvm: 14
+            version: '14.0.6'
+            sha256: a46a843b0899d284f2a1c76e15aa9a6f3e939925ed008fd4b3b68c5f2f0c8231
+          - llvm: 15
+            version: '15.0.7'
+            sha256: 8c55ba91a041507bd927c5f82348c36ef3696485afb71c51bbcc35a014d179de
+          - llvm: 16
+            version: '16.0.6'
+            sha256: 8082a28d7ff50e5dfdace530935e3e59c37d11f1f8b52f43b7dc3b2fa130be66
+          - llvm: 17
+            version: '17.0.6'
+            sha256: 773f122cd79a54ecf3cbf1b1aff47543e95b12b4f91278b29c70cade37e3018c
+          - llvm: 18
+            version: '18.1.8'
+            sha256: 7cb37bafd78874e707d0c323f8e16e81503bc76867638ef1c634ee0451fac0be
+          - llvm: 19
+            version: '19.1.7'
+            sha256: d39689f23e1143a710a9120741ac3a1621fc4e2a81a143959bc870c60f9b85d1
+          - llvm: 20
+            version: '20.1.8'
+            sha256: 0944367aff9c3619f98dd0db78a1489018af9a8501b2533d17cc143a9624d853
+          - llvm: 21
+            version: '21.1.4'
+            sha256: f18f364b3aea5e4d09a4ed58d1c34b7220883912662e39935af96fabd603a912
+          - llvm: 22
+            version: '22.1.0'
+            sha256: 00199342f0cedfae60421d5d4ce0f1e217a06d7617611c8541372c47269c7084
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,97 +101,61 @@ jobs:
           msystem: CLANG64
           path-type: inherit
           update: true
-          install: curl
-      - name: Install LLVM 19
-        shell: msys2 {0}
-        env:
-          LLVM_VERSION: '19.1.7'
-          MSYS2_LLVM_PACKAGE_VERSION: '19.1.7-1'
+          install: >-
+            mingw-w64-clang-x86_64-libc++
+            mingw-w64-clang-x86_64-pkgconf
+      - name: Install LLVM ${{ matrix.llvm }}
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $archiveName = 'llvm-${{ matrix.version }}-windows-gnu.zip'
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $url = "https://github.com/yasuo-ozu/llvm-full/releases/download/v${{ matrix.version }}/$archiveName"
+          curl.exe --fail --location --retry 3 --output $archive $url
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to download $url"
+          }
 
-          repo=https://repo.msys2.org/mingw/clang64
-          prefix=mingw-w64-clang-x86_64
-          # MSYS2 is a rolling repository and can eventually remove these old
-          # artifacts. If a URL starts returning 404, refresh the transitive
-          # dependency versions and signatures together while keeping LLVM 19
-          # pinned to the version above.
-          packages=(
-            "clang-$MSYS2_LLVM_PACKAGE_VERSION"
-            "clang-libs-$MSYS2_LLVM_PACKAGE_VERSION"
-            "compiler-rt-$MSYS2_LLVM_PACKAGE_VERSION"
-            "llvm-$MSYS2_LLVM_PACKAGE_VERSION"
-            "llvm-libs-$MSYS2_LLVM_PACKAGE_VERSION"
-            "lld-$MSYS2_LLVM_PACKAGE_VERSION"
-            "libc++-$MSYS2_LLVM_PACKAGE_VERSION"
-            "libunwind-$MSYS2_LLVM_PACKAGE_VERSION"
-            'gettext-runtime-0.22.5-2'
-            'libffi-3.4.6-1'
-            'libiconv-1.17-4'
-            'libxml2-2.12.9-2'
-            'xz-5.6.3-3'
-            'zlib-1.3.1-1'
-            'zstd-1.5.6-2'
-          )
-          download_dir="$(mktemp -d)"
-          trap 'rm -rf "$download_dir"' EXIT
-          archives=()
-          for package in "${packages[@]}"; do
-            archive="$prefix-$package-any.pkg.tar.zst"
-            curl --fail --location --retry 3 \
-              --output "$download_dir/$archive" \
-              "$repo/$archive"
-            curl --fail --location --retry 3 \
-              --output "$download_dir/$archive.sig" \
-              "$repo/$archive.sig"
-            archives+=("$download_dir/$archive")
-          done
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne '${{ matrix.sha256 }}') {
+            throw "expected SHA-256 ${{ matrix.sha256 }}, got $actualSha256"
+          }
 
-          # These archived LLVM 19 packages predate MSYS2's rename of the
-          # compiler-runtime virtual dependency from gcc-libs to cc-libs.
-          # libc++ 19 still supplies that runtime, so satisfy only the renamed
-          # package metadata rather than upgrading the pinned LLVM toolchain.
-          assumed_cc_runtime="$prefix-cc-libs=$LLVM_VERSION"
-          # pacman discovers each adjacent .sig file and validates it against
-          # the MSYS2 package keyring before installing the local archive.
-          pacman --noconfirm -U \
-            --assume-installed "$assumed_cc_runtime" \
-            "${archives[@]}"
-          pacman --noconfirm -S --needed \
-            --assume-installed "$assumed_cc_runtime" \
-            "$prefix-pkgconf"
+          $prefix = Join-Path $env:RUNNER_TEMP 'llvm-${{ matrix.version }}'
+          New-Item -ItemType Directory -Force -Path $prefix | Out-Null
+          7z x $archive "-o$prefix" -y
+          if ($LASTEXITCODE -ne 0) {
+            throw "failed to extract $archive"
+          }
+          Remove-Item $archive
 
-          for package in clang clang-libs compiler-rt llvm llvm-libs lld libc++ libunwind; do
-            installed="$(pacman -Q "$prefix-$package" | awk '{print $2}')"
-            if [[ "$installed" != "$MSYS2_LLVM_PACKAGE_VERSION" ]]; then
-              echo "expected $package $MSYS2_LLVM_PACKAGE_VERSION, got $installed" >&2
-              exit 1
-            fi
-          done
-      - name: Test LLVM 19
+          if (-not (Test-Path (Join-Path $prefix 'bin\llvm-config.exe'))) {
+            throw "llvm-config.exe is missing from $prefix"
+          }
+          (Join-Path $prefix 'bin') | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Test LLVM ${{ matrix.llvm }}
         shell: msys2 {0}
         run: |
           set -euo pipefail
 
           llvm_version="$(llvm-config --version)"
-          if [[ "$llvm_version" != 19.1.7 ]]; then
-            echo "expected LLVM 19.1.7, got $llvm_version" >&2
+          if [[ "$llvm_version" != '${{ matrix.version }}' ]]; then
+            echo "expected LLVM ${{ matrix.version }}, got $llvm_version" >&2
             exit 1
           fi
 
           # Supply the installed LLVM's include and library paths through the
-          # pkg-config name consumed by the Windows LLVM 19 binding.
+          # versioned pkg-config name consumed by the Windows binding.
           pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
           mkdir -p "$pc_dir"
           cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
           ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ')"
           printf '%s\n' \
-            'Name: LLVM 19' \
-            'Description: LLVM 19 host compiler and linker flags' \
+            'Name: LLVM ${{ matrix.llvm }}' \
+            'Description: LLVM ${{ matrix.llvm }} host compiler and linker flags' \
             "Version: $llvm_version" \
             "Cflags: $cflags" \
             "Libs: $ldflags" \
-            > "$pc_dir/llvm-19.pc"
+            > "$pc_dir/llvm-${{ matrix.llvm }}.pc"
 
           export CC=clang
           export CXX=clang++
@@ -168,8 +163,9 @@ jobs:
           PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
           export PKG_CONFIG_PATH
           clang --version
-          go test -v -tags=llvm19
+          go test -v -tags=llvm${{ matrix.llvm }}
       - name: Test default LLVM
+        if: matrix.llvm == 19
         shell: msys2 {0}
         run: |
           set -euo pipefail
