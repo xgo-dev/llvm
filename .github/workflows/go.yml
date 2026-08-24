@@ -131,12 +131,14 @@ jobs:
           if (-not (Test-Path (Join-Path $prefix 'bin\llvm-config.exe'))) {
             throw "llvm-config.exe is missing from $prefix"
           }
-          (Join-Path $prefix 'bin') | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "LLVM_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Test LLVM ${{ matrix.llvm }}
         shell: msys2 {0}
         run: |
           set -euo pipefail
 
+          llvm_bin="$(cygpath -u "$LLVM_PREFIX")/bin"
+          export PATH="$llvm_bin:$PATH"
           llvm_version="$(llvm-config --version)"
           if [[ "$llvm_version" != '${{ matrix.version }}' ]]; then
             echo "expected LLVM ${{ matrix.version }}, got $llvm_version" >&2
@@ -169,6 +171,8 @@ jobs:
         shell: msys2 {0}
         run: |
           set -euo pipefail
+          llvm_bin="$(cygpath -u "$LLVM_PREFIX")/bin"
+          export PATH="$llvm_bin:$PATH"
           export CC=clang
           export CXX=clang++
           export CGO_ENABLED=1
