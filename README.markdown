@@ -13,7 +13,7 @@ Currently supported:
 
   * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 from [apt.llvm.org](http://apt.llvm.org/) on Debian/Ubuntu.
   * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 from Homebrew on macOS.
-  * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 in an MSYS2 CLANG64 environment on Windows (see the setup below).
+  * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 in an MSYS2 MINGW64 environment on Windows (see the setup below).
   * Any of the above versions with a manually built LLVM through the `byollvm` build tag. You need to set up `CFLAGS`/`LDFLAGS` etc yourself in this case.
 
 You can select the LLVM version using a build tag, for example `-tags=llvm17`
@@ -27,11 +27,11 @@ If you have a supported LLVM installation, you should be able to do a simple `go
 
 You can use build tags to select a LLVM version. For example, use `-tags=llvm15` to select LLVM 15. Setting a build tag for a LLVM version that is not supported will be ignored.
 
-### Windows (MSYS2 CLANG64)
+### Windows (MSYS2 MINGW64)
 
 The Windows bindings expect `pkg-config` metadata named after the selected LLVM
 major version, such as `llvm-19`. After installing a MinGW-compatible LLVM and
-`pkgconf` in a CLANG64 environment, generate that file from `llvm-config`:
+`pkgconf` in a MINGW64 environment, generate that file from `llvm-config`:
 
     pc_dir="$PWD/.llvm-pkgconfig"
     mkdir -p "$pc_dir"

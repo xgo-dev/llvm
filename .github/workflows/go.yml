@@ -98,12 +98,12 @@ jobs:
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: CLANG64
+          msystem: MINGW64
           path-type: inherit
           update: true
           install: >-
-            mingw-w64-clang-x86_64-libc++
-            mingw-w64-clang-x86_64-pkgconf
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-pkgconf
       - name: Install LLVM ${{ matrix.llvm }}
         shell: pwsh
         run: |
