@@ -65,11 +65,12 @@ jobs:
         with:
           go-version: '1.22'
       - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
         with:
           msystem: CLANG64
           path-type: inherit
           update: true
+          install: curl
       - name: Install LLVM 19
         shell: msys2 {0}
         env:
@@ -80,6 +81,10 @@ jobs:
 
           repo=https://repo.msys2.org/mingw/clang64
           prefix=mingw-w64-clang-x86_64
+          # MSYS2 is a rolling repository and can eventually remove these old
+          # artifacts. If a URL starts returning 404, refresh the transitive
+          # dependency versions and signatures together while keeping LLVM 19
+          # pinned to the version above.
           packages=(
             "clang-$MSYS2_LLVM_PACKAGE_VERSION"
             "clang-libs-$MSYS2_LLVM_PACKAGE_VERSION"
@@ -97,9 +102,18 @@ jobs:
             'zlib-1.3.1-1'
             'zstd-1.5.6-2'
           )
-          urls=()
+          download_dir="$(mktemp -d)"
+          trap 'rm -rf "$download_dir"' EXIT
+          archives=()
           for package in "${packages[@]}"; do
-            urls+=("$repo/$prefix-$package-any.pkg.tar.zst")
+            archive="$prefix-$package-any.pkg.tar.zst"
+            curl --fail --location --retry 3 \
+              --output "$download_dir/$archive" \
+              "$repo/$archive"
+            curl --fail --location --retry 3 \
+              --output "$download_dir/$archive.sig" \
+              "$repo/$archive.sig"
+            archives+=("$download_dir/$archive")
           done
 
           # These archived LLVM 19 packages predate MSYS2's rename of the
@@ -107,9 +121,11 @@ jobs:
           # libc++ 19 still supplies that runtime, so satisfy only the renamed
           # package metadata rather than upgrading the pinned LLVM toolchain.
           assumed_cc_runtime="$prefix-cc-libs=$LLVM_VERSION"
+          # pacman discovers each adjacent .sig file and validates it against
+          # the MSYS2 package keyring before installing the local archive.
           pacman --noconfirm -U \
             --assume-installed "$assumed_cc_runtime" \
-            "${urls[@]}"
+            "${archives[@]}"
           pacman --noconfirm -S --needed \
             --assume-installed "$assumed_cc_runtime" \
             "$prefix-pkgconf"
@@ -132,8 +148,8 @@ jobs:
             exit 1
           fi
 
-          # The Windows binding keeps LLVM's host flags package-local through
-          # pkg-config, so they do not affect unrelated CGO packages.
+          # Supply the installed LLVM's include and library paths through the
+          # pkg-config name consumed by the Windows LLVM 19 binding.
           pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
           mkdir -p "$pc_dir"
           cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
@@ -149,7 +165,8 @@ jobs:
           export CC=clang
           export CXX=clang++
           export CGO_ENABLED=1
-          export PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          export PKG_CONFIG_PATH
           clang --version
           go test -v -tags=llvm19
       - name: Test default LLVM
@@ -160,7 +177,8 @@ jobs:
           export CXX=clang++
           export CGO_ENABLED=1
           pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
-          export PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
+          export PKG_CONFIG_PATH
           go test -v
   test-linux-fedora:
     # Fedora uses different paths than other systems, so testing it separately.
