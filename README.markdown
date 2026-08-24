@@ -30,8 +30,9 @@ You can use build tags to select a LLVM version. For example, use `-tags=llvm15`
 ### Windows (MSYS2 MINGW64)
 
 The Windows bindings expect `pkg-config` metadata named after the selected LLVM
-major version, such as `llvm-19`. After installing a MinGW-compatible LLVM and
-`pkgconf` in a MINGW64 environment, generate that file from `llvm-config`:
+major version, such as `llvm-19`. After installing a MinGW-compatible LLVM,
+`mingw-w64-x86_64-gcc`, and `mingw-w64-x86_64-pkgconf` in a MINGW64
+environment, generate that file from `llvm-config`:
 
     pc_dir="$PWD/.llvm-pkgconfig"
     mkdir -p "$pc_dir"
@@ -42,7 +43,8 @@ major version, such as `llvm-19`. After installing a MinGW-compatible LLVM and
       *) echo "unsupported LLVM version: $llvm_version" >&2; exit 1 ;;
     esac
     cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
-    ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ')"
+    # Normalize the release build machine's zstd path and link winpthread.
+    ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ' | sed -E 's#[^[:space:]]*/mingw64/lib/libzstd\.dll\.a#-lzstd#g') -lwinpthread"
     printf '%s\n' \
       "Name: LLVM $llvm_major" \
       "Description: LLVM $llvm_major host compiler and linker flags" \
@@ -51,7 +53,7 @@ major version, such as `llvm-19`. After installing a MinGW-compatible LLVM and
       "Libs: $ldflags" \
       > "$pc_dir/llvm-$llvm_major.pc"
     export PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
-    export CC=clang CXX=clang++ CGO_ENABLED=1
+    export CC=gcc CXX=g++ CGO_ENABLED=1
     go test -tags="llvm$llvm_major"
 
 The Windows CI job in [`.github/workflows/go.yml`](.github/workflows/go.yml)

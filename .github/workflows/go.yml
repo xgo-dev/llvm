@@ -150,7 +150,9 @@ jobs:
           pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
           mkdir -p "$pc_dir"
           cflags="$(llvm-config --cflags | tr '\r\n' '  ')"
-          ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ')"
+          # The release archives can embed their build machine's zstd import
+          # library path, and their static LLVM libraries require winpthread.
+          ldflags="$(llvm-config --ldflags --libs all --system-libs | tr '\r\n' '  ' | sed -E 's#[^[:space:]]*/mingw64/lib/libzstd\.dll\.a#-lzstd#g') -lwinpthread"
           printf '%s\n' \
             'Name: LLVM ${{ matrix.llvm }}' \
             'Description: LLVM ${{ matrix.llvm }} host compiler and linker flags' \
@@ -159,12 +161,12 @@ jobs:
             "Libs: $ldflags" \
             > "$pc_dir/llvm-${{ matrix.llvm }}.pc"
 
-          export CC=clang
-          export CXX=clang++
+          export CC=gcc
+          export CXX=g++
           export CGO_ENABLED=1
           PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
           export PKG_CONFIG_PATH
-          clang --version
+          gcc --version
           go test -v -tags=llvm${{ matrix.llvm }}
       - name: Test default LLVM
         if: matrix.llvm == 19
@@ -173,8 +175,8 @@ jobs:
           set -euo pipefail
           llvm_bin="$(cygpath -u "$LLVM_PREFIX")/bin"
           export PATH="$llvm_bin:$PATH"
-          export CC=clang
-          export CXX=clang++
+          export CC=gcc
+          export CXX=g++
           export CGO_ENABLED=1
           pc_dir="$(cygpath -u "$RUNNER_TEMP")/llvm-pkgconfig"
           PKG_CONFIG_PATH="$(cygpath -m "$pc_dir")"
