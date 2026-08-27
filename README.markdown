@@ -30,7 +30,7 @@ You can use build tags to select a LLVM version. For example, use `-tags=llvm15`
 ### Windows (MSYS2 MINGW64)
 
 The Windows bindings expect `pkg-config` metadata named after the selected LLVM
-major version, such as `llvm-19`. After installing a MinGW-compatible LLVM,
+major version, such as `llvm-21`. After installing a MinGW-compatible LLVM,
 `mingw-w64-x86_64-gcc`, and `mingw-w64-x86_64-pkgconf` in a MINGW64
 environment, generate that file from `llvm-config`:
 

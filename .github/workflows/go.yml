@@ -169,7 +169,7 @@ jobs:
           gcc --version
           go test -v -tags=llvm${{ matrix.llvm }}
       - name: Test default LLVM
-        if: matrix.llvm == 19
+        if: matrix.llvm == 21
         shell: msys2 {0}
         run: |
           set -euo pipefail
