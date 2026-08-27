@@ -678,6 +678,7 @@ func (t Type) StructSetBody(elementTypes []Type, packed bool) {
 }
 
 func (t Type) IsStructPacked() bool         { return C.LLVMIsPackedStruct(t.C) != 0 }
+func (t Type) IsStructOpaque() bool         { return C.LLVMIsOpaqueStruct(t.C) != 0 }
 func (t Type) StructElementTypesCount() int { return int(C.LLVMCountStructElementTypes(t.C)) }
 func (t Type) StructElementTypes() []Type {
 	out := make([]Type, t.StructElementTypesCount())
