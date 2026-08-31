@@ -16,8 +16,8 @@ Currently supported:
   * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 in an MSYS2 MINGW64 environment on Windows (see the setup below).
   * Any of the above versions with a manually built LLVM through the `byollvm` build tag. You need to set up `CFLAGS`/`LDFLAGS` etc yourself in this case.
 
-You can select the LLVM version using a build tag, for example `-tags=llvm17`
-to use LLVM 17.
+LLVM 21 is selected by default. You can select another LLVM version using a
+build tag, for example `-tags=llvm19` to use LLVM 19.
 
 ## Usage
 
@@ -30,7 +30,7 @@ You can use build tags to select a LLVM version. For example, use `-tags=llvm15`
 ### Windows (MSYS2 MINGW64)
 
 The Windows bindings expect `pkg-config` metadata named after the selected LLVM
-major version, such as `llvm-19`. After installing a MinGW-compatible LLVM,
+major version, such as `llvm-21`. After installing a MinGW-compatible LLVM,
 `mingw-w64-x86_64-gcc`, and `mingw-w64-x86_64-pkgconf` in a MINGW64
 environment, generate that file from `llvm-config`:
 

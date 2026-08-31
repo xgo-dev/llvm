@@ -18,6 +18,21 @@ import (
 	"testing"
 )
 
+func TestStructIsOpaque(t *testing.T) {
+	ctx := NewContext()
+	defer ctx.Dispose()
+
+	typ := ctx.StructCreateNamed("T")
+	if !typ.IsStructOpaque() {
+		t.Fatal("new named struct is not opaque")
+	}
+
+	typ.StructSetBody(nil, false)
+	if typ.IsStructOpaque() {
+		t.Fatal("defined empty named struct is opaque")
+	}
+}
+
 func testAttribute(t *testing.T, name string) {
 	ctx := NewContext()
 	mod := ctx.NewModule("")
