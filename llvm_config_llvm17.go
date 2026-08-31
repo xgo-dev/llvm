@@ -11,6 +11,8 @@ package llvm
 // #cgo linux        CPPFLAGS: -I/usr/include/llvm-17 -I/usr/include/llvm-c-17 -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
 // #cgo linux        CXXFLAGS: -std=c++17
 // #cgo linux        LDFLAGS: -L/usr/lib/llvm-17/lib  -lLLVM-17
+// #cgo windows      pkg-config: llvm-17
+// #cgo windows      CXXFLAGS: -std=c++17
 import "C"
 
 type run_build_sh int

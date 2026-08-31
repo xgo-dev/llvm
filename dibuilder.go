@@ -610,6 +610,14 @@ func (d *DIBuilder) CreateExpression(addr []uint64) Metadata {
 	return Metadata{C: result}
 }
 
+// InsertDeclareAtEnd inserts a call to llvm.dbg.declare at the end of the
+// specified basic block for the given value and associated debug metadata.
+func (d *DIBuilder) InsertDeclareAtEnd(v Value, diVarInfo, expr Metadata, l DebugLoc, bb BasicBlock) {
+	loc := C.LLVMDIBuilderCreateDebugLocation(
+		d.m.Context().C, C.uint(l.Line), C.uint(l.Col), l.Scope.C, l.InlinedAt.C)
+	C.LLVMGoDIBuilderInsertDbgDeclareRecordAtEnd(d.ref, v.C, diVarInfo.C, expr.C, loc, bb.C)
+}
+
 // InsertValueAtEnd inserts a call to llvm.dbg.value at the end of the
 // specified basic block for the given value and associated debug metadata.
 func (d *DIBuilder) InsertValueAtEnd(v Value, diVarInfo, expr Metadata, l DebugLoc, bb BasicBlock) {

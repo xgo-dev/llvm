@@ -1,8 +1,10 @@
 package llvm_test
 
-import "tinygo.org/x/go-llvm"
+import (
+	"testing"
 
-import "testing"
+	"github.com/xgo-dev/llvm"
+)
 
 // Dummy test function.
 // All it does is test whether we can use LLVM at all.

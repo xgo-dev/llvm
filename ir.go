@@ -72,6 +72,7 @@ type (
 	AtomicOrdering      C.LLVMAtomicOrdering
 	TypeKind            C.LLVMTypeKind
 	Linkage             C.LLVMLinkage
+	DLLStorageClass     C.LLVMDLLStorageClass
 	Visibility          C.LLVMVisibility
 	CallConv            C.LLVMCallConv
 	ComdatSelectionKind C.LLVMComdatSelectionKind
@@ -253,6 +254,16 @@ const (
 )
 
 //-------------------------------------------------------------------------
+// llvm.DLLStorageClass
+//-------------------------------------------------------------------------
+
+const (
+	DefaultStorageClass   DLLStorageClass = C.LLVMDefaultStorageClass
+	DLLImportStorageClass DLLStorageClass = C.LLVMDLLImportStorageClass
+	DLLExportStorageClass DLLStorageClass = C.LLVMDLLExportStorageClass
+)
+
+//-------------------------------------------------------------------------
 // llvm.Linkage
 //-------------------------------------------------------------------------
 
@@ -370,6 +381,13 @@ func (c Context) MDKindID(name string) (id int) {
 
 func MDKindID(name string) (id int) {
 	return GlobalContext().MDKindID(name)
+}
+
+func LookupIntrinsicID(name string) (id int) {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	id = int(C.LLVMLookupIntrinsicID(cname, C.size_t(len(name))))
+	return
 }
 
 //-------------------------------------------------------------------------
@@ -509,6 +527,22 @@ func (m Module) AddNamedMetadataOperand(name string, operand Metadata) {
 	defer C.free(unsafe.Pointer(cname))
 	C.LLVMAddNamedMetadataOperand2(m.C, cname, operand.C)
 }
+func (m Module) NamedMetadataNumOperands(name string) int {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	return int(C.LLVMGetNamedMetadataNumOperands(m.C, cname))
+}
+func (m Module) NamedMetadataOperands(name string) []Value {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	n := int(C.LLVMGetNamedMetadataNumOperands(m.C, cname))
+	if n == 0 {
+		return nil
+	}
+	values := make([]Value, n)
+	C.LLVMGetNamedMetadataOperands(m.C, cname, llvmValueRefPtr(&values[0]))
+	return values
+}
 
 func (m Module) Context() (c Context) {
 	c.C = C.LLVMGetModuleContext(m.C)
@@ -563,6 +597,8 @@ func (c Context) DoubleType() (t Type)   { t.C = C.LLVMDoubleTypeInContext(c.C);
 func (c Context) X86FP80Type() (t Type)  { t.C = C.LLVMX86FP80TypeInContext(c.C); return }
 func (c Context) FP128Type() (t Type)    { t.C = C.LLVMFP128TypeInContext(c.C); return }
 func (c Context) PPCFP128Type() (t Type) { t.C = C.LLVMPPCFP128TypeInContext(c.C); return }
+
+func (c Context) MetadataType() (t Type) { t.C = C.LLVMMetadataTypeInContext(c.C); return }
 
 // Operations on function types
 func FunctionType(returnType Type, paramTypes []Type, isVarArg bool) (t Type) {
@@ -816,8 +852,32 @@ func (c Context) MDNode(mds []Metadata) (md Metadata) {
 	md.C = C.LLVMMDNode2(c.C, ptr, nvals)
 	return
 }
+func (v Value) MDNodeNumOperands() int {
+	return int(C.LLVMGetMDNodeNumOperands(v.C))
+}
+func (v Value) MDNodeOperands() []Value {
+	n := v.MDNodeNumOperands()
+	if n == 0 {
+		return nil
+	}
+	values := make([]Value, n)
+	C.LLVMGetMDNodeOperands(v.C, llvmValueRefPtr(&values[0]))
+	return values
+}
+func (v Value) IsAMDString() bool {
+	return C.LLVMIsAMDString(v.C) != nil
+}
+func (v Value) MDString() string {
+	var n C.unsigned
+	s := C.LLVMGetMDString(v.C, &n)
+	return C.GoStringN(s, C.int(n))
+}
 func (v Value) ConstantAsMetadata() (md Metadata) {
 	md.C = C.LLVMConstantAsMetadata(v.C)
+	return
+}
+func (c Context) MetadataAsValue(md Metadata) (v Value) {
+	v.C = C.LLVMMetadataAsValue(c.C, md.C)
 	return
 }
 
@@ -959,7 +1019,13 @@ func (v Value) GlobalParent() (m Module) { m.C = C.LLVMGetGlobalParent(v.C); ret
 func (v Value) IsDeclaration() bool      { return C.LLVMIsDeclaration(v.C) != 0 }
 func (v Value) Linkage() Linkage         { return Linkage(C.LLVMGetLinkage(v.C)) }
 func (v Value) SetLinkage(l Linkage)     { C.LLVMSetLinkage(v.C, C.LLVMLinkage(l)) }
-func (v Value) Section() string          { return C.GoString(C.LLVMGetSection(v.C)) }
+func (v Value) DLLStorageClass() DLLStorageClass {
+	return DLLStorageClass(C.LLVMGetDLLStorageClass(v.C))
+}
+func (v Value) SetDLLStorageClass(c DLLStorageClass) {
+	C.LLVMSetDLLStorageClass(v.C, C.LLVMDLLStorageClass(c))
+}
+func (v Value) Section() string { return C.GoString(C.LLVMGetSection(v.C)) }
 func (v Value) SetSection(str string) {
 	cstr := C.CString(str)
 	defer C.free(unsafe.Pointer(cstr))
@@ -1110,6 +1176,19 @@ func (v Value) RemoveEnumAttributeAtIndex(i int, kind uint) {
 func (v Value) RemoveEnumFunctionAttribute(kind uint) {
 	v.RemoveEnumAttributeAtIndex(C.LLVMAttributeFunctionIndex, kind)
 }
+func (v Value) GetFunctionAttributes() (attrs []Attribute) {
+	return v.GetAttributesAtIndex(C.LLVMAttributeFunctionIndex)
+}
+func (v Value) GetAttributesAtIndex(i int) (attrs []Attribute) {
+	n := C.LLVMGetAttributeCountAtIndex(v.C, C.LLVMAttributeIndex(i))
+	if n == 0 {
+		return
+	}
+	attrs = make([]Attribute, n)
+	C.LLVMGetAttributesAtIndex(v.C, C.LLVMAttributeIndex(i), &attrs[0].C)
+	return
+}
+
 func (v Value) RemoveStringAttributeAtIndex(i int, kind string) {
 	ckind := C.CString(kind)
 	defer C.free(unsafe.Pointer(ckind))
@@ -1193,9 +1272,14 @@ func AddBasicBlock(f Value, name string) (bb BasicBlock) {
 func InsertBasicBlock(ref BasicBlock, name string) (bb BasicBlock) {
 	return GlobalContext().InsertBasicBlock(ref, name)
 }
+func AppendExistingBasicBlock(f Value, bb BasicBlock) {
+	C.LLVMAppendExistingBasicBlock(f.C, bb.C)
+}
+
 func (bb BasicBlock) EraseFromParent()          { C.LLVMDeleteBasicBlock(bb.C) }
 func (bb BasicBlock) MoveBefore(pos BasicBlock) { C.LLVMMoveBasicBlockBefore(bb.C, pos.C) }
 func (bb BasicBlock) MoveAfter(pos BasicBlock)  { C.LLVMMoveBasicBlockAfter(bb.C, pos.C) }
+func (bb BasicBlock) RemoveFromParent()         { C.LLVMRemoveBasicBlockFromParent(bb.C) }
 
 // Operations on instructions
 func (v Value) EraseFromParentAsInstruction()      { C.LLVMInstructionEraseFromParent(v.C) }
@@ -1866,6 +1950,14 @@ func (b Builder) CreateCall(t Type, fn Value, args []Value, name string) (v Valu
 	defer C.free(unsafe.Pointer(cname))
 	ptr, nvals := llvmValueRefs(args)
 	v.C = C.LLVMBuildCall2(b.C, t.C, fn.C, ptr, nvals, cname)
+	return
+}
+
+func (b Builder) CreateIntrinsic(ret Type, id int, args []Value, name string) (v Value) {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	ptr, nvals := llvmValueRefs(args)
+	v.C = C.LLVMGoBuildIntrinsicCall(b.C, ret.C, C.unsigned(id), ptr, nvals, cname)
 	return
 }
 

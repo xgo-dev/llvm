@@ -1,4 +1,5 @@
-//go:build !byollvm && llvm19
+//go:build !byollvm && !llvm14 && !llvm15 && !llvm16 && !llvm17 && !llvm18 && !llvm20 && !llvm21 && !llvm22
+// +build !byollvm,!llvm14,!llvm15,!llvm16,!llvm17,!llvm18,!llvm20,!llvm21,!llvm22
 
 package llvm
 
@@ -14,6 +15,8 @@ package llvm
 // #cgo linux        CPPFLAGS: -I/usr/include/llvm-19 -I/usr/include/llvm-c-19 -I/usr/lib64/llvm19/include -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
 // #cgo linux        CXXFLAGS: -std=c++17
 // #cgo linux        LDFLAGS: -L/usr/lib/llvm-19/lib -L/usr/lib64/llvm19/lib -lLLVM-19
+// #cgo windows      pkg-config: llvm-19
+// #cgo windows      CXXFLAGS: -std=c++17
 import "C"
 
 type run_build_sh int
