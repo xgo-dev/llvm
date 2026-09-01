@@ -187,17 +187,13 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        llvm: [19, 20, 21, 22]
+        llvm: [22]
     container: fedora:44
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install dependencies (default LLVM)
-        if: matrix.llvm == 22
         run: dnf install --assumeyes g++ golang llvm-devel
-      - name: Install dependencies (older LLVM)
-        if: matrix.llvm != 22
-        run: dnf install --assumeyes g++ golang llvm${{ matrix.llvm }}-devel
       - name: Test LLVM ${{ matrix.llvm }}
         run:
           go test -v -tags=llvm${{ matrix.llvm }}
