@@ -1,4 +1,4 @@
-//go:build !byollvm && llvm22
+//go:build !byollvm && (llvm22 || (!llvm14 && !llvm15 && !llvm16 && !llvm17 && !llvm18 && !llvm19 && !llvm20 && !llvm21))
 
 package llvm
 
