@@ -45,7 +45,9 @@ case1:
 		t.Fatal(err)
 	}
 
-	m, err := ctx.ParseIR(buf)
+	defer buf.Dispose()
+
+	m, err := ctx.ParseIRBuffer(buf)
 	if err != nil {
 		t.Fatal(err)
 	}

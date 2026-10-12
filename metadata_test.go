@@ -103,7 +103,9 @@ func TestNamedMetadataRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsed, err := (&parseCtx).ParseIR(buf)
+	defer buf.Dispose()
+
+	parsed, err := (&parseCtx).ParseIRBuffer(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
