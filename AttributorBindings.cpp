@@ -1,6 +1,11 @@
+//===- AttributorBindings.cpp - Attributor bindings -----------------------===//
+//
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
 #include "AttributorBindings.h"
 #include "llvm/Config/llvm-config.h"
 
@@ -11,10 +16,14 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/Attributor.h"
 #include "llvm/Transforms/Utils/CallGraphUpdater.h"
+
+using namespace llvm;
+
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(TargetMachine, LLVMTargetMachineRef)
 #endif
 
 LLVMErrorRef LLVMGoRunAttributorHeapToStack(LLVMModuleRef M,
-                                            LLVMTargetMachineRef TM) {
+                                         LLVMTargetMachineRef TM) {
 #if LLVM_VERSION_MAJOR >= 22
   using namespace llvm;
   if (!M)
@@ -24,7 +33,7 @@ LLVMErrorRef LLVMGoRunAttributorHeapToStack(LLVMModuleRef M,
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
-  PassBuilder PB(reinterpret_cast<TargetMachine *>(TM));
+  PassBuilder PB(unwrap(TM));
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
   PB.registerFunctionAnalyses(FAM);

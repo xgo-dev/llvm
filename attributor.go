@@ -16,8 +16,8 @@ import "errors"
 // pipeline can promote/scalarize the resulting stack storage.
 //
 // The caller supplies allocation contracts, data layout, and target triple on
-// the module. A zero TargetMachine selects target-independent analysis. optnone bodies
-// are not seeded. LLVM 22 or newer is required.
+// the module. A zero TargetMachine selects target-independent analysis.
+// Functions marked optnone are not seeded. LLVM 22 or newer is required.
 func (mod Module) RunAttributorHeapToStack(tm TargetMachine) error {
 	if err := C.LLVMGoRunAttributorHeapToStack(mod.C, tm.C); err != nil {
 		message := C.LLVMGetErrorMessage(err)
