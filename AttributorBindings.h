@@ -15,7 +15,9 @@
 extern "C" {
 #endif
 LLVMErrorRef LLVMGoRunAttributorHeapToStack(LLVMModuleRef M,
-                                         LLVMTargetMachineRef TM);
+                                            LLVMTargetMachineRef TM,
+                                            LLVMValueRef *ExcludedCalls,
+                                            unsigned NumExcludedCalls);
 #ifdef __cplusplus
 }
 #endif
