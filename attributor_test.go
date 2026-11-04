@@ -63,9 +63,9 @@ define i64 @unoptimized(i64 %x) noinline optnone {
   %v = load i64, ptr %p, align 8
   ret i64 %v
 }
-; Atomic accesses keep the promoted slot alive through O2. A loop-local
-; alloca would consume additional stack on every iteration.
-declare ptr @malloc(i64)
+; Atomic accesses keep a loop-local alloca alive through O2, consuming more
+; stack on every iteration. Entry slots can instead be scalarized.
+declare ptr @malloc(i64) allocsize(0) allockind("alloc,uninitialized") "alloc-family"="malloc"
 define i64 @loop(i64 %n) {
 entry:
   br label %body
@@ -81,7 +81,7 @@ exit:
   ret i64 %v
 }
 ; Multiple entries make this cycle irreducible, so LoopInfo alone is
-; insufficient. Exercise LLVM's standard allocator recognition as well.
+; insufficient. Exercise allocation attributes on the declaration as well.
 define i64 @irreducible(i1 %first, i1 %again) {
 entry:
   br i1 %first, label %left, label %right
@@ -92,6 +92,93 @@ left:
   br i1 %again, label %right, label %exit
 right:
   br label %left
+exit:
+  ret i64 %v
+}
+; The old object and the new object coexist in the same iteration. Only
+; the independent q allocation may reuse an entry slot.
+define i64 @mixed_carried(i64 %n) {
+entry:
+  %initial = call ptr @zero(i64 16) allockind("alloc,zeroed")
+  br label %body
+body:
+  %previous = phi ptr [%initial, %entry], [%p, %body]
+  %i = phi i64 [0, %entry], [%next, %body]
+  %p = call ptr @alloc(i64 16) allockind("alloc,uninitialized")
+  store i64 %i, ptr %p, align 8
+  %old = load i64, ptr %previous, align 8
+  %q = call ptr @alloc(i64 16) allockind("alloc,uninitialized")
+  store atomic i64 %old, ptr %q seq_cst, align 8
+  %v = load atomic i64, ptr %q seq_cst, align 8
+  %next = add i64 %i, 1
+  %more = icmp ult i64 %next, %n
+  br i1 %more, label %body, label %exit
+exit:
+  ret i64 %v
+}
+define i64 @zero_loop(i64 %n) {
+entry:
+  br label %body
+body:
+  %i = phi i64 [0, %entry], [%next, %body]
+  %p = call ptr @zero(i64 16) allockind("alloc,zeroed")
+  %v = load atomic i64, ptr %p seq_cst, align 8
+  store atomic i64 99, ptr %p seq_cst, align 8
+  %next = add i64 %i, 1
+  %more = icmp ult i64 %next, %n
+  br i1 %more, label %body, label %exit
+exit:
+  ret i64 %v
+}
+; HeapToStack still decides whether calls capture the pointer. The placement
+; check must neither reject all calls nor treat passing an argument as safe
+; without HeapToStack's own checks.
+declare void @consume(ptr captures(none)) nofree
+define void @call_loop(i1 %again) {
+entry:
+  br label %body
+body:
+  %p = call ptr @alloc(i64 16) allockind("alloc,uninitialized")
+  call void @consume(ptr %p)
+  br i1 %again, label %body, label %exit
+exit:
+  ret void
+}
+define void @captured_loop(i1 %again) {
+entry:
+  br label %body
+body:
+  %p = call ptr @alloc(i64 16) allockind("alloc,uninitialized")
+  call void @capture(ptr %p)
+  br i1 %again, label %body, label %exit
+exit:
+  ret void
+}
+; Reject the allocation before its uses are visited, including free calls.
+; Otherwise the must-free fallback could bypass the placement restriction.
+declare void @free(ptr allocptr) allockind("free") "alloc-family"="malloc"
+define void @cross_block_free(i1 %again) {
+entry:
+  br label %body
+body:
+  %p = call ptr @malloc(i64 16)
+  br label %use
+use:
+  call void @consume(ptr %p)
+  call void @free(ptr %p)
+  br i1 %again, label %body, label %exit
+exit:
+  ret void
+}
+; This helper must not move pre-existing allocas owned by other transforms.
+define i64 @existing_alloca(i1 %again) {
+entry:
+  br label %body
+body:
+  %p = alloca i64
+  store atomic i64 42, ptr %p seq_cst, align 8
+  %v = load atomic i64, ptr %p seq_cst, align 8
+  br i1 %again, label %body, label %exit
 exit:
   ret i64 %v
 }
@@ -131,21 +218,54 @@ define i64 @indirect(ptr %fn) {
 			t.Fatalf("%s lost a required allocation:\n%s", name, body)
 		}
 	}
-	checkCycles := func() {
-		for _, name := range []string{"loop", "irreducible"} {
+	blockText := func(bb BasicBlock) string {
+		var text strings.Builder
+		for i := bb.FirstInstruction(); !i.IsNil(); i = NextInstruction(i) {
+			text.WriteString(i.String())
+		}
+		return text.String()
+	}
+	checkCycles := func(expectSlots bool) {
+		for _, name := range []string{"loop", "irreducible", "call_loop"} {
+			fn := mod.NamedFunction(name)
+			if (expectSlots && !strings.Contains(blockText(fn.EntryBasicBlock()), "alloca ")) || strings.Contains(fn.String(), "@alloc(") || strings.Contains(fn.String(), "@malloc(") {
+				t.Fatalf("%s must reuse entry storage:\n%s", name, fn.String())
+			}
+		}
+		fn := mod.NamedFunction("mixed_carried")
+		if (expectSlots && !strings.Contains(blockText(fn.EntryBasicBlock()), "alloca ")) || strings.Count(fn.String(), "@alloc(") != 1 {
+			t.Fatalf("mixed loop must promote local storage and preserve carried storage:\n%s", fn.String())
+		}
+		for _, name := range []string{"loop", "irreducible", "mixed_carried", "zero_loop", "call_loop", "captured_loop", "cross_block_free"} {
+			fn := mod.NamedFunction(name)
+			for bb := NextBasicBlock(fn.EntryBasicBlock()); !bb.IsNil(); bb = NextBasicBlock(bb) {
+				if strings.Contains(blockText(bb), "alloca ") {
+					t.Fatalf("%s retains non-entry stack allocation:\n%s", name, fn.String())
+				}
+			}
+		}
+		for _, name := range []string{"captured_loop", "cross_block_free"} {
 			body := mod.NamedFunction(name).String()
-			if strings.Contains(body, "alloca ") || (!strings.Contains(body, "@alloc(") && !strings.Contains(body, "@malloc(")) {
-				t.Fatalf("%s must retain heap storage, not allocate stack per iteration:\n%s", name, body)
+			if !strings.Contains(body, "@alloc(") && !strings.Contains(body, "@malloc(") {
+				t.Fatalf("%s lost its required heap allocation:\n%s", name, body)
 			}
 		}
 	}
-	checkCycles()
+	checkCycles(true)
+	zeroLoop := mod.NamedFunction("zero_loop")
+	if strings.Contains(blockText(zeroLoop.EntryBasicBlock()), "@llvm.memset") || !strings.Contains(blockText(NextBasicBlock(zeroLoop.EntryBasicBlock())), "@llvm.memset") {
+		t.Fatalf("zero initialization must stay inside the loop:\n%s", zeroLoop.String())
+	}
+	existing := mod.NamedFunction("existing_alloca")
+	if strings.Contains(blockText(existing.EntryBasicBlock()), "alloca ") || !strings.Contains(blockText(NextBasicBlock(existing.EntryBasicBlock())), "alloca ") {
+		t.Fatalf("moved an unrelated alloca:\n%s", existing.String())
+	}
 	opts := NewPassBuilderOptions()
 	defer opts.Dispose()
 	if err := mod.RunPasses("default<O2>", tm, opts); err != nil {
 		t.Fatal(err)
 	}
-	checkCycles()
+	checkCycles(false)
 	for _, name := range []string{"local", "zeroed"} {
 		body := mod.NamedFunction(name).String()
 		if strings.Contains(body, "alloca ") || strings.Contains(body, "call ") {
