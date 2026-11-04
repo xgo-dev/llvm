@@ -10,6 +10,8 @@
 #include "llvm/Config/llvm-config.h"
 
 #if LLVM_VERSION_MAJOR >= 22
+#include "llvm/ADT/SCCIterator.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CBindingWrapping.h"
@@ -56,6 +58,21 @@ LLVMErrorRef LLVMGoRunAttributorHeapToStack(LLVMModuleRef M,
   Config.RewriteSignatures = false;
   Config.DefaultInitializeLiveInternals = false;
   Attributor A(Functions, InfoCache, Config);
+  // LLVM can leave promoted allocas inside cycles without stackrestore.
+  // Conservatively disable heap-to-stack for the whole cyclic function until
+  // per-iteration storage reuse is proven. SCCs cover irreducible cycles too.
+  // Register pessimistic attributes before seeding any analysis so a query
+  // from another function cannot re-enable promotion in an excluded body.
+  for (Function *F : Functions) {
+    for (auto I = scc_begin(F); !I.isAtEnd(); ++I) {
+      if (!I.hasCycle())
+        continue;
+      auto &AA = AAHeapToStack::createForPosition(IRPosition::function(*F), A);
+      AA.getState().indicatePessimisticFixpoint();
+      A.registerAA(AA);
+      break;
+    }
+  }
   // Only seed heap-to-stack and let it request its dependencies. Seeding all
   // default analyses also changes signatures and runs unrelated deductions,
   // including LLVM 22's unsafe invariant-load inference for indirect calls.

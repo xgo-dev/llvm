@@ -63,6 +63,42 @@ define i64 @unoptimized(i64 %x) noinline optnone {
   %v = load i64, ptr %p, align 8
   ret i64 %v
 }
+; Atomic accesses keep the promoted slot alive through O2. A loop-local
+; alloca would consume additional stack on every iteration.
+declare ptr @malloc(i64)
+define i64 @loop(i64 %n) {
+entry:
+  br label %body
+body:
+  %i = phi i64 [0, %entry], [%next, %body]
+  %p = call ptr @alloc(i64 16) allockind("alloc,uninitialized")
+  store atomic i64 %i, ptr %p seq_cst, align 8
+  %v = load atomic i64, ptr %p seq_cst, align 8
+  %next = add i64 %i, 1
+  %more = icmp ult i64 %next, %n
+  br i1 %more, label %body, label %exit
+exit:
+  ret i64 %v
+}
+; Multiple entries make this cycle irreducible, so LoopInfo alone is
+; insufficient. Exercise LLVM's standard allocator recognition as well.
+define i64 @irreducible(i1 %first, i1 %again) {
+entry:
+  br i1 %first, label %left, label %right
+left:
+  %p = call ptr @malloc(i64 16)
+  store atomic i64 42, ptr %p seq_cst, align 8
+  %v = load atomic i64, ptr %p seq_cst, align 8
+  br i1 %again, label %right, label %exit
+right:
+  br label %left
+exit:
+  ret i64 %v
+}
+define i64 @loop_caller(i64 %n) {
+  %v = call i64 @loop(i64 %n)
+  ret i64 %v
+}
 ; Full Attributor in LLVM 22 crashes in invariant-load inference on this
 ; indirect-call result. Heap-to-stack does not require that analysis.
 define i64 @indirect(ptr %fn) {
@@ -95,11 +131,21 @@ define i64 @indirect(ptr %fn) {
 			t.Fatalf("%s lost a required allocation:\n%s", name, body)
 		}
 	}
+	checkCycles := func() {
+		for _, name := range []string{"loop", "irreducible"} {
+			body := mod.NamedFunction(name).String()
+			if strings.Contains(body, "alloca ") || (!strings.Contains(body, "@alloc(") && !strings.Contains(body, "@malloc(")) {
+				t.Fatalf("%s must retain heap storage, not allocate stack per iteration:\n%s", name, body)
+			}
+		}
+	}
+	checkCycles()
 	opts := NewPassBuilderOptions()
 	defer opts.Dispose()
 	if err := mod.RunPasses("default<O2>", tm, opts); err != nil {
 		t.Fatal(err)
 	}
+	checkCycles()
 	for _, name := range []string{"local", "zeroed"} {
 		body := mod.NamedFunction(name).String()
 		if strings.Contains(body, "alloca ") || strings.Contains(body, "call ") {
