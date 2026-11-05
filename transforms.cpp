@@ -4,6 +4,8 @@
 
 // Generic LLVM utilities exposed to Go; policy belongs to the caller.
 #include "transforms.h"
+#include "llvm/Analysis/MemoryBuiltins.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
@@ -16,6 +18,21 @@ using namespace llvm;
 static_assert(CallInst::TCK_None == 0 && CallInst::TCK_Tail == 1 &&
                   CallInst::TCK_MustTail == 2 && CallInst::TCK_NoTail == 3,
               "update the Go TailCallKind constants for this LLVM version");
+
+LLVMBool LLVMGoGetConstantAllocationSize(LLVMValueRef Call, uint64_t *Size) {
+  auto *CB = Call ? dyn_cast<CallBase>(unwrap(Call)) : nullptr;
+  if (!CB || !CB->getParent() || !CB->getFunction() || !CB->getModule() ||
+      !CB->getType()->isPointerTy() || !Size)
+    return false;
+  FunctionAnalysisManager FAM;
+  TargetLibraryAnalysis TLA;
+  auto TLI = TLA.run(*CB->getFunction(), FAM);
+  auto Bytes = getAllocSize(CB, &TLI, [](const Value *V) { return V; });
+  if (!Bytes || Bytes->getActiveBits() > 64)
+    return false;
+  *Size = Bytes->getZExtValue();
+  return true;
+}
 
 LLVMValueRef LLVMGoGetNamedValue(LLVMModuleRef M, const char *Name,
                                  size_t Len) {

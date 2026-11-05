@@ -11,6 +11,16 @@ package llvm
 import "C"
 import "unsafe"
 
+// ConstantAllocationSize queries LLVM's allocation-size analysis using the
+// module's target triple and data layout. It returns false for unknown sizes,
+// non-call values, or sizes that do not fit uint64. A known size does not imply
+// that the allocation is removable or safe to move to the stack.
+func (v Value) ConstantAllocationSize() (size uint64, known bool) {
+	var bytes C.uint64_t
+	known = C.LLVMGoGetConstantAllocationSize(v.C, &bytes) != 0
+	return uint64(bytes), known
+}
+
 // CloneFunction copies a function into its module, including its attributes,
 // blocks, instructions and debug information. Local references are remapped;
 // references to other functions and globals remain unchanged. The caller can

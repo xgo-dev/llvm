@@ -10,6 +10,7 @@
 extern "C" {
 #endif
 LLVMValueRef LLVMGoGetNamedValue(LLVMModuleRef M, const char *Name, size_t Len);
+LLVMBool LLVMGoGetConstantAllocationSize(LLVMValueRef Call, uint64_t *Size);
 // Invalid inputs are reported to the Go layer, which raises a Go panic.
 LLVMValueRef LLVMGoCloneFunction(LLVMValueRef Fn); // null on invalid input
 LLVMBool LLVMGoSimplifyInstructionsInBlock(LLVMBasicBlockRef BB);

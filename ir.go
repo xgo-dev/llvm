@@ -138,6 +138,7 @@ const (
 	Switch      Opcode = C.LLVMSwitch
 	IndirectBr  Opcode = C.LLVMIndirectBr
 	Invoke      Opcode = C.LLVMInvoke
+	CallBr      Opcode = C.LLVMCallBr
 	Unreachable Opcode = C.LLVMUnreachable
 
 	// Standard Binary Operators
@@ -839,7 +840,10 @@ func (u Use) UsedValue() (v Value) { v.C = C.LLVMGetUsedValue(u.C); return }
 // Operations on Users
 func (v Value) Operand(i int) (rv Value)   { rv.C = C.LLVMGetOperand(v.C, C.unsigned(i)); return }
 func (v Value) SetOperand(i int, op Value) { C.LLVMSetOperand(v.C, C.unsigned(i), op.C) }
-func (v Value) OperandsCount() int         { return int(C.LLVMGetNumOperands(v.C)) }
+
+// OperandUse returns the use at an operand index, including call operands.
+func (v Value) OperandUse(i int) (u Use) { u.C = C.LLVMGetOperandUse(v.C, C.unsigned(i)); return }
+func (v Value) OperandsCount() int       { return int(C.LLVMGetNumOperands(v.C)) }
 
 // Operations on terminator instructions (br, switch, etc). Unlike operands,
 // the number and meaning of successors has been stable across LLVM versions,
@@ -1346,6 +1350,11 @@ func NextInstruction(v Value) (rv Value)           { rv.C = C.LLVMGetNextInstruc
 func PrevInstruction(v Value) (rv Value)           { rv.C = C.LLVMGetPreviousInstruction(v.C); return }
 
 // Operations on call sites
+
+// ArgOperandsCount returns the number of arguments of a call, invoke or callbr.
+// Operand bundles, the called value and successor blocks are not arguments.
+func (v Value) ArgOperandsCount() int { return int(C.LLVMGetNumArgOperands(v.C)) }
+
 func (v Value) SetInstructionCallConv(cc CallConv) {
 	C.LLVMSetInstructionCallConv(v.C, C.unsigned(cc))
 }
