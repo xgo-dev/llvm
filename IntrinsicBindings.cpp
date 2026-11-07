@@ -36,6 +36,8 @@ LLVMGoIntrinsicSignature LLVMGoMatchIntrinsicSignature(unsigned ID,
     return Result;
   SmallVector<Type *, 8> Types;
 #if LLVM_VERSION_MAJOR >= 23
+  // LLVM 23 renamed this API. The binding's supported/tested ceiling is LLVM
+  // 22; a full LLVM 23 port must also adapt the IIT descriptor representation.
   if (!Intrinsic::isSignatureValid(ID, FT, Types))
     return Result;
 #else
@@ -75,7 +77,7 @@ LLVMBool LLVMGoIsTargetIntrinsic(unsigned ID) {
 }
 
 unsigned LLVMGoIntrinsicImmArgs(unsigned ID, LLVMTypeRef Signature,
-                                unsigned *Indices) {
+                                unsigned *Indices, size_t Capacity) {
   if (!validID(ID) || !Signature)
     return 0;
   auto *FT = dyn_cast<FunctionType>(unwrap(Signature));
@@ -89,14 +91,15 @@ unsigned LLVMGoIntrinsicImmArgs(unsigned ID, LLVMTypeRef Signature,
   unsigned Count = 0;
   for (unsigned I = 0; I < FT->getNumParams(); ++I)
     if (Attrs.hasParamAttr(I, Attribute::ImmArg)) {
-      if (Indices)
+      if (Indices && Count < Capacity)
         Indices[Count] = I;
       ++Count;
     }
   return Count;
 }
 
-size_t LLVMGoIntrinsicDescriptors(unsigned ID, LLVMGoIITDescriptor *Out) {
+size_t LLVMGoIntrinsicDescriptors(unsigned ID, LLVMGoIITDescriptor *Out,
+                                  size_t Capacity) {
   if (!validID(ID))
     return 0;
   SmallVector<Intrinsic::IITDescriptor, 16> Entries;
@@ -104,7 +107,7 @@ size_t LLVMGoIntrinsicDescriptors(unsigned ID, LLVMGoIITDescriptor *Out) {
   if (!Out)
     return Entries.size();
   using D = Intrinsic::IITDescriptor;
-  for (size_t I = 0; I < Entries.size(); ++I) {
+  for (size_t I = 0; I < std::min(Entries.size(), Capacity); ++I) {
     auto Dsc = Entries[I];
     LLVMGoIITDescriptor R{};
     switch (Dsc.Kind) {
@@ -192,6 +195,10 @@ size_t LLVMGoIntrinsicDescriptors(unsigned ID, LLVMGoIITDescriptor *Out) {
       R.reference = Dsc.getRefArgNumber();
       break;
 #endif
+    default:
+      R.kind = "Unknown";
+      R.value = static_cast<unsigned>(Dsc.Kind);
+      break;
     }
     Out[I] = R;
   }
@@ -232,9 +239,13 @@ LLVMBool LLVMGoConstIntInRange(LLVMValueRef Value, uint64_t Low, uint64_t High,
 }
 
 LLVMTargetDataRef LLVMGoParseTargetData(const char *Layout, char **Error) {
+  if (Error)
+    *Error = nullptr;
   auto Parsed = DataLayout::parse(Layout);
   if (!Parsed) {
-    *Error = LLVMCreateMessage(toString(Parsed.takeError()).c_str());
+    auto Message = toString(Parsed.takeError());
+    if (Error)
+      *Error = LLVMCreateMessage(Message.c_str());
     return nullptr;
   }
   return wrap(new DataLayout(std::move(*Parsed)));

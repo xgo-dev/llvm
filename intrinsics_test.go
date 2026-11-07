@@ -149,8 +149,8 @@ func TestIntrinsicMetadata(t *testing.T) {
 			generic++
 		}
 		for _, d := range IntrinsicDescriptors(id) {
-			if d.Kind == "" {
-				t.Fatalf("unhandled descriptor for %s", name)
+			if d.Kind == "" || d.Kind == "Unknown" {
+				t.Fatalf("unhandled descriptor for %s: %+v", name, d)
 			}
 		}
 	}
@@ -161,5 +161,56 @@ func TestIntrinsicMetadata(t *testing.T) {
 	want := []IITDescriptor{{Kind: "Argument", ArgumentKind: 1}, {Kind: "Argument", ArgumentKind: 7}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ctpop descriptors: %+v", got)
+	}
+}
+
+func TestIntrinsicOutputCapacity(t *testing.T) {
+	ctx := NewContext()
+	defer ctx.Dispose()
+	id := LookupIntrinsicID("llvm.prefetch")
+	i32 := ctx.Int32Type()
+	sig := FunctionType(ctx.VoidType(), []Type{PointerType(ctx.Int8Type(), 0), i32, i32, i32}, false)
+	want := IntrinsicImmediateArguments(id, sig)
+	// LLVM 14 marks rw/locality as immarg; newer LLVM also marks cache type.
+	if !reflect.DeepEqual(want, []int{1, 2}) && !reflect.DeepEqual(want, []int{1, 2, 3}) {
+		t.Fatalf("prefetch immediate arguments: %v", want)
+	}
+	const sentinel = 0xdeadbeef
+	for _, capacity := range []int{0, 1, len(want), len(want) + 1} {
+		out := make([]intrinsicIndex, capacity+2)
+		for i := range out {
+			out[i] = sentinel
+		}
+		if n := intrinsicImmediateArgumentsInto(id, sig, out[:capacity]); n != len(want) {
+			t.Fatalf("capacity %d: total %d, want %d", capacity, n, len(want))
+		}
+		for i, value := range out {
+			if i < capacity && i < len(want) {
+				if int(value) != want[i] {
+					t.Fatalf("capacity %d: index %d is %d", capacity, i, value)
+				}
+			} else if value != sentinel {
+				t.Fatalf("capacity %d: overwrote index %d", capacity, i)
+			}
+		}
+	}
+	descriptors := IntrinsicDescriptors(id)
+	for _, capacity := range []int{0, 1, len(descriptors), len(descriptors) + 1} {
+		out := make([]intrinsicDescriptor, capacity+2)
+		for i := range out {
+			out[i].value = sentinel
+		}
+		if n := intrinsicDescriptorsInto(id, out[:capacity]); n != len(descriptors) {
+			t.Fatalf("capacity %d: descriptor total %d", capacity, n)
+		}
+		for i, d := range out {
+			if i < capacity && i < len(descriptors) {
+				if d.kind == nil || uint32(d.value) != descriptors[i].Value {
+					t.Fatalf("capacity %d: incorrect descriptor %d", capacity, i)
+				}
+			} else if d.value != sentinel || d.kind != nil {
+				t.Fatalf("capacity %d: overwrote descriptor %d", capacity, i)
+			}
+		}
 	}
 }

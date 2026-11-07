@@ -4,6 +4,18 @@ package llvm
 
 import "testing"
 
+func TestParseTargetDataWithoutErrorOutput(t *testing.T) {
+	if td := parseTargetData("e-p:abc", nil); td.C != nil {
+		td.Dispose()
+		t.Fatal("invalid layout accepted without an error pointer")
+	}
+	td := parseTargetData("e-p:64:64", nil)
+	if td.C == nil {
+		t.Fatal("valid layout failed without an error pointer")
+	}
+	td.Dispose()
+}
+
 func TestExtendedTypeQueries(t *testing.T) {
 	c := NewContext()
 	defer c.Dispose()

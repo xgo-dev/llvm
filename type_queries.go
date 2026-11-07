@@ -75,14 +75,19 @@ func (v Value) ConstUintInRange(low, high uint64) bool {
 // ParseTargetData parses a layout without aborting on malformed input. Dispose
 // the returned TargetData after use. NewTargetData retains its original API.
 func ParseTargetData(layout string) (td TargetData, err error) {
-	c := C.CString(layout)
-	defer C.free(unsafe.Pointer(c))
 	var message *C.char
-	td.C = C.LLVMGoParseTargetData(c, &message)
+	td = parseTargetData(layout, &message)
 	if message != nil {
 		defer C.LLVMDisposeMessage(message)
 		err = errors.New(C.GoString(message))
 	}
+	return
+}
+
+func parseTargetData(layout string, message **C.char) (td TargetData) {
+	c := C.CString(layout)
+	defer C.free(unsafe.Pointer(c))
+	td.C = C.LLVMGoParseTargetData(c, message)
 	return
 }
 

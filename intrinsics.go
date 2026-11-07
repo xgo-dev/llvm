@@ -9,6 +9,9 @@ import "C"
 
 import "unsafe"
 
+type intrinsicIndex = C.unsigned
+type intrinsicDescriptor = C.LLVMGoIITDescriptor
+
 func llvmTypeRefs(types []Type) (*C.LLVMTypeRef, int) {
 	if len(types) == 0 {
 		return nil, 0
@@ -111,20 +114,33 @@ func (m Module) IntrinsicDeclaration(id int, overloads []Type) (v Value) {
 // LLVM's immarg attribute. Signature must be the matched canonical function
 // type. Additional constraints absent from LLVM's metadata are not inferred.
 func IntrinsicImmediateArguments(id int, signature Type) []int {
-	if !validIntrinsicID(id) {
+	if !validIntrinsicID(id) || signature.IsNil() || signature.TypeKind() != FunctionTypeKind {
 		return nil
 	}
-	n := int(C.LLVMGoIntrinsicImmArgs(C.unsigned(id), signature.C, nil))
+	// At most one immarg attribute per fixed parameter. Fill once, avoiding
+	// rebuilding LLVM's AttributeList in separate probe and fill calls.
+	capacity := signature.ParamTypesCount()
+	if capacity == 0 {
+		return nil
+	}
+	raw := make([]intrinsicIndex, capacity)
+	n := intrinsicImmediateArgumentsInto(id, signature, raw)
 	if n == 0 {
 		return nil
 	}
-	raw := make([]C.unsigned, n)
-	C.LLVMGoIntrinsicImmArgs(C.unsigned(id), signature.C, &raw[0])
 	out := make([]int, n)
-	for i, value := range raw {
+	for i, value := range raw[:n] {
 		out[i] = int(value)
 	}
 	return out
+}
+
+func intrinsicImmediateArgumentsInto(id int, signature Type, out []intrinsicIndex) int {
+	var p *C.unsigned
+	if len(out) != 0 {
+		p = &out[0]
+	}
+	return int(C.LLVMGoIntrinsicImmArgs(C.unsigned(id), signature.C, p, C.size_t(len(out))))
 }
 
 // IITDescriptor is one record in LLVM's intrinsic type metadata. Kind uses
@@ -138,6 +154,7 @@ func IntrinsicImmediateArguments(id int, signature Type) []int {
 // for OneNthEltsVecArgument and VecOfAnyPtrsToElt. Scalable applies to Vector.
 // Fields without a meaning for Kind are zero. The result descriptor precedes
 // the parameter descriptors; composite types are encoded recursively.
+// An unrecognized LLVM descriptor has Kind="Unknown" and its raw kind in Value.
 type IITDescriptor struct {
 	Kind         string
 	Value        uint32
@@ -153,17 +170,31 @@ func IntrinsicDescriptors(id int) []IITDescriptor {
 	if !validIntrinsicID(id) {
 		return nil
 	}
-	n := int(C.LLVMGoIntrinsicDescriptors(C.unsigned(id), nil))
+	n := intrinsicDescriptorsInto(id, nil)
 	if n == 0 {
 		return nil
 	}
-	raw := make([]C.LLVMGoIITDescriptor, n)
-	C.LLVMGoIntrinsicDescriptors(C.unsigned(id), &raw[0])
+	raw := make([]intrinsicDescriptor, n)
+	for {
+		n = intrinsicDescriptorsInto(id, raw)
+		if n <= len(raw) {
+			break
+		}
+		raw = make([]intrinsicDescriptor, n)
+	}
 	out := make([]IITDescriptor, n)
-	for i, d := range raw {
+	for i, d := range raw[:n] {
 		out[i] = IITDescriptor{Kind: C.GoString(d.kind), Value: uint32(d.value),
 			Argument: uint32(d.argument), ArgumentKind: uint32(d.argument_kind),
 			Reference: uint32(d.reference), Scalable: d.scalable != 0}
 	}
 	return out
+}
+
+func intrinsicDescriptorsInto(id int, out []intrinsicDescriptor) int {
+	var p *C.LLVMGoIITDescriptor
+	if len(out) != 0 {
+		p = &out[0]
+	}
+	return int(C.LLVMGoIntrinsicDescriptors(C.unsigned(id), p, C.size_t(len(out))))
 }
