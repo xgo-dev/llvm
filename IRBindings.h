@@ -33,6 +33,8 @@ struct LLVMDebugLocMetadata{
     LLVMMetadataRef InlinedAt;
 };
 
+LLVMValueRef LLVMGoConstInt(LLVMTypeRef Ty, uint64_t Value, LLVMBool SignExtend);
+
 LLVMValueRef LLVMGoConstFPFromBits(LLVMTypeRef Ty, const uint64_t *Words,
                                  unsigned NumWords);
 unsigned LLVMGoConstFPGetBits(LLVMValueRef Val, uint64_t *Words);

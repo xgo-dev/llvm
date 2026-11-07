@@ -134,7 +134,6 @@ func llvmMetadataRefs(mds []Metadata) (*C.LLVMMetadataRef, C.unsigned) {
 
 const (
 	Ret         Opcode = C.LLVMRet
-	Br          Opcode = C.LLVMBr
 	Switch      Opcode = C.LLVMSwitch
 	IndirectBr  Opcode = C.LLVMIndirectBr
 	Invoke      Opcode = C.LLVMInvoke
@@ -807,7 +806,6 @@ func (v Value) IsAPHINode() (rv Value)             { rv.C = C.LLVMIsAPHINode(v.C
 func (v Value) IsASelectInst() (rv Value)          { rv.C = C.LLVMIsASelectInst(v.C); return }
 func (v Value) IsAShuffleVectorInst() (rv Value)   { rv.C = C.LLVMIsAShuffleVectorInst(v.C); return }
 func (v Value) IsAStoreInst() (rv Value)           { rv.C = C.LLVMIsAStoreInst(v.C); return }
-func (v Value) IsABranchInst() (rv Value)          { rv.C = C.LLVMIsABranchInst(v.C); return }
 func (v Value) IsAInvokeInst() (rv Value)          { rv.C = C.LLVMIsAInvokeInst(v.C); return }
 func (v Value) IsAReturnInst() (rv Value)          { rv.C = C.LLVMIsAReturnInst(v.C); return }
 func (v Value) IsASwitchInst() (rv Value)          { rv.C = C.LLVMIsASwitchInst(v.C); return }
@@ -908,9 +906,12 @@ func (c Context) MetadataAsValue(md Metadata) (v Value) {
 }
 
 // Operations on scalar constants
+
+// ConstInt truncates n to the integer type's width. For types wider than 64
+// bits, signExtend selects sign extension of int64(n) instead of zero extension.
 func ConstInt(t Type, n uint64, signExtend bool) (v Value) {
-	v.C = C.LLVMConstInt(t.C,
-		C.ulonglong(n),
+	v.C = C.LLVMGoConstInt(t.C,
+		C.uint64_t(n),
 		boolToLLVMBool(signExtend))
 	return
 }
