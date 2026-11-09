@@ -19,6 +19,10 @@ func (t TypeKind) String() string {
 	switch t {
 	case VoidTypeKind:
 		return "VoidTypeKind"
+	case HalfTypeKind:
+		return "HalfTypeKind"
+	case BFloatTypeKind:
+		return "BFloatTypeKind"
 	case FloatTypeKind:
 		return "FloatTypeKind"
 	case DoubleTypeKind:
@@ -43,8 +47,12 @@ func (t TypeKind) String() string {
 		return "PointerTypeKind"
 	case VectorTypeKind:
 		return "VectorTypeKind"
+	case ScalableVectorTypeKind:
+		return "ScalableVectorTypeKind"
 	case MetadataTypeKind:
 		return "MetadataTypeKind"
+	case TokenTypeKind:
+		return "TokenTypeKind"
 	}
 	panic("unreachable")
 }
