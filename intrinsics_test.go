@@ -4,6 +4,7 @@ package llvm
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -140,8 +141,23 @@ func TestIntrinsicMetadata(t *testing.T) {
 	generic, target := 0, 0
 	for id := 1; id < IntrinsicCount(); id++ {
 		name := IntrinsicName(id)
-		if name == "" || LookupIntrinsicID(name) != id {
+		if name == "" {
 			t.Fatalf("ID %d name %q", id, name)
+		}
+		if got := LookupIntrinsicID(name); got != id {
+			// LLVM 18 puts these target-prefixed names in its generic table.
+			// Its lookup selects the AArch64 table and returns 0 instead.
+			// Preserve that C API behavior while checking their metadata below.
+			knownUnregistered := false
+			if strings.HasPrefix(Version, "18.") && got == 0 {
+				switch name {
+				case "llvm.aarch64.sve.pmov.to.pred.lane", "llvm.aarch64.sve.pmov.to.pred.lane.zero", "llvm.aarch64.sve.pmov.to.vector.lane.merging", "llvm.aarch64.sve.pmov.to.vector.lane.zeroing":
+					knownUnregistered = true
+				}
+			}
+			if !knownUnregistered {
+				t.Fatalf("ID %d name %q resolves to %d", id, name, got)
+			}
 		}
 		if IntrinsicIsTarget(id) {
 			target++

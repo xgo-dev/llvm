@@ -27,8 +27,17 @@ define void @empty() {
 `
 	ctx := NewContext()
 	defer ctx.Dispose()
+	ir := source
+	personality := "personality ptr @personality"
+	if strings.HasPrefix(Version, "14.") {
+		// LLVM 14 still defaults to typed pointers; retain the same fixture
+		// and property checks rather than skipping the supported version.
+		ir = strings.ReplaceAll(ir, "ptr", "i8*")
+		personality = "personality i32 (...)* @personality"
+		ir = strings.ReplaceAll(ir, "personality i8* @personality", personality)
+	}
 	path := filepath.Join(t.TempDir(), "properties.ll")
-	if err := os.WriteFile(path, []byte(source), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(ir), 0600); err != nil {
 		t.Fatal(err)
 	}
 	buf, err := NewMemoryBufferFromFile(path)
@@ -44,7 +53,7 @@ define void @empty() {
 	if !to.CopyFunctionProperties(from) {
 		t.Fatal("valid functions rejected")
 	}
-	for _, property := range []string{"linkonce_odr hidden fastcc", "local_unnamed_addr", `section "example"`, "comdat($source)", "align 64", `gc "shadow-stack"`, "prefix i32 123", "prologue i32 456", "personality ptr @personality"} {
+	for _, property := range []string{"linkonce_odr hidden fastcc", "local_unnamed_addr", `section "example"`, "comdat($source)", "align 64", `gc "shadow-stack"`, "prefix i32 123", "prologue i32 456", personality} {
 		if !strings.Contains(to.String(), property) {
 			t.Errorf("lost %s:\n%s", property, to.String())
 		}
