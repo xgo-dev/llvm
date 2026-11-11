@@ -1263,6 +1263,14 @@ func (v Value) SetPersonality(p Value) {
 	C.LLVMSetPersonalityFn(v.C, p.C)
 }
 
+// CopyFunctionProperties copies linkage, calling convention, alignment and
+// other function/global properties from a function in the same module. It
+// preserves v's attribute list so ABI rewrites can remap parameter and return
+// attributes independently. It does not copy the body or metadata attachments.
+func (v Value) CopyFunctionProperties(from Value) {
+	C.LLVMGoCopyFunctionProperties(v.C, from.C)
+}
+
 // Operations on parameters
 func (v Value) ParamsCount() int { return int(C.LLVMCountParams(v.C)) }
 func (v Value) Params() []Value {

@@ -26,6 +26,21 @@
 
 using namespace llvm;
 
+void LLVMGoCopyFunctionProperties(LLVMValueRef To, LLVMValueRef From) {
+  auto *Dst = cast<Function>(unwrap(To));
+  auto *Src = cast<Function>(unwrap(From));
+  // ABI rewriting owns the destination's signature-dependent attribute list.
+  auto Attributes = Dst->getAttributes();
+  Dst->copyAttributesFrom(Src);
+  Dst->setAttributes(Attributes);
+  Dst->setLinkage(Src->getLinkage());
+  Dst->setComdat(Src->getComdat());
+  // copyAttributesFrom only assigns these when they exist on the source.
+  Dst->setPersonalityFn(Src->hasPersonalityFn() ? Src->getPersonalityFn() : nullptr);
+  Dst->setPrefixData(Src->hasPrefixData() ? Src->getPrefixData() : nullptr);
+  Dst->setPrologueData(Src->hasPrologueData() ? Src->getPrologueData() : nullptr);
+}
+
 LLVMValueRef LLVMGoConstFPFromBits(LLVMTypeRef Ty, const uint64_t *Words,
                                  unsigned NumWords) {
   if (!Ty || !unwrap(Ty)->isFloatingPointTy())
