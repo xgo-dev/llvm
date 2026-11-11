@@ -26,19 +26,23 @@
 
 using namespace llvm;
 
-void LLVMGoCopyFunctionProperties(LLVMValueRef To, LLVMValueRef From) {
-  auto *Dst = cast<Function>(unwrap(To));
-  auto *Src = cast<Function>(unwrap(From));
+LLVMBool LLVMGoCopyFunctionProperties(LLVMValueRef To, LLVMValueRef From) {
+  auto *Dst = dyn_cast_or_null<Function>(unwrap(To));
+  auto *Src = dyn_cast_or_null<Function>(unwrap(From));
+  if (!Dst || !Src || !Dst->getParent() || Dst->getParent() != Src->getParent())
+    return 0;
   // ABI rewriting owns the destination's signature-dependent attribute list.
   auto Attributes = Dst->getAttributes();
+  // Visibility and DLL storage setters require non-local linkage first.
+  Dst->setLinkage(Src->getLinkage());
   Dst->copyAttributesFrom(Src);
   Dst->setAttributes(Attributes);
-  Dst->setLinkage(Src->getLinkage());
   Dst->setComdat(Src->getComdat());
   // copyAttributesFrom only assigns these when they exist on the source.
   Dst->setPersonalityFn(Src->hasPersonalityFn() ? Src->getPersonalityFn() : nullptr);
   Dst->setPrefixData(Src->hasPrefixData() ? Src->getPrefixData() : nullptr);
   Dst->setPrologueData(Src->hasPrologueData() ? Src->getPrologueData() : nullptr);
+  return 1;
 }
 
 LLVMValueRef LLVMGoConstFPFromBits(LLVMTypeRef Ty, const uint64_t *Words,

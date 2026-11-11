@@ -18,7 +18,7 @@ declare i32 @personality(...)
 define linkonce_odr hidden fastcc i32 @source(ptr nonnull %p) local_unnamed_addr nounwind section "example" comdat align 64 gc "shadow-stack" prefix i32 123 prologue i32 456 personality ptr @personality {
   ret i32 0
 }
-define void @destination(ptr noalias %out, i32 %value) noinline {
+define internal void @destination(ptr noalias %out, i32 %value) noinline {
   ret void
 }
 define void @empty() {
@@ -41,7 +41,9 @@ define void @empty() {
 	}
 	defer mod.Dispose()
 	from, to := mod.NamedFunction("source"), mod.NamedFunction("destination")
-	to.CopyFunctionProperties(from)
+	if !to.CopyFunctionProperties(from) {
+		t.Fatal("valid functions rejected")
+	}
 	for _, property := range []string{"linkonce_odr hidden fastcc", "local_unnamed_addr", `section "example"`, "comdat($source)", "align 64", `gc "shadow-stack"`, "prefix i32 123", "prologue i32 456", "personality ptr @personality"} {
 		if !strings.Contains(to.String(), property) {
 			t.Errorf("lost %s:\n%s", property, to.String())
@@ -53,7 +55,11 @@ define void @empty() {
 	if err := VerifyModule(mod, ReturnStatusAction); err != nil {
 		t.Fatal(err)
 	}
-	to.CopyFunctionProperties(mod.NamedFunction("empty"))
+	empty := mod.NamedFunction("empty")
+	empty.SetLinkage(InternalLinkage)
+	if !to.CopyFunctionProperties(empty) || to.Linkage() != InternalLinkage {
+		t.Fatal("copy to internal linkage failed")
+	}
 	for _, property := range []string{"linkonce_odr", "hidden", "fastcc", "unnamed_addr", "section", "comdat", "align 64", "gc ", "prefix", "prologue", "personality"} {
 		if strings.Contains(to.String(), property) {
 			t.Errorf("did not clear %s:\n%s", property, to.String())
@@ -64,5 +70,38 @@ define void @empty() {
 	}
 	if err := VerifyModule(mod, ReturnStatusAction); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCopyFunctionPropertiesRejectsInvalidInputs(t *testing.T) {
+	ctx, otherCtx := NewContext(), NewContext()
+	defer ctx.Dispose()
+	defer otherCtx.Dispose()
+	mod, otherMod := ctx.NewModule("local"), ctx.NewModule("other")
+	defer mod.Dispose()
+	defer otherMod.Dispose()
+	foreignMod := otherCtx.NewModule("foreign")
+	defer foreignMod.Dispose()
+	fn := AddFunction(mod, "local", FunctionType(ctx.VoidType(), nil, false))
+	other := AddFunction(otherMod, "other", fn.GlobalValueType())
+	foreign := AddFunction(foreignMod, "foreign", FunctionType(otherCtx.VoidType(), nil, false))
+	global := AddGlobal(mod, ctx.Int8Type(), "data")
+	for _, tc := range []struct {
+		name     string
+		to, from Value
+	}{
+		{"nil destination", Value{}, fn}, {"nil source", fn, Value{}},
+		{"global destination", global, fn}, {"global source", fn, global},
+		{"other module", fn, other}, {"other context", fn, foreign},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before := mod.String()
+			if tc.to.CopyFunctionProperties(tc.from) {
+				t.Error("invalid inputs accepted")
+			}
+			if mod.String() != before {
+				t.Error("rejected copy modified the destination module")
+			}
+		})
 	}
 }
