@@ -1,9 +1,13 @@
 
 #include "backports.h"
+#include "llvm/Config/llvm-config.h"
 #include "llvm/Analysis/ModuleSummaryAnalysis.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Instructions.h"
+#if LLVM_VERSION_MAJOR >= 23
+#include "llvm/Transforms/Utils/AssignGUID.h"
+#endif
 #if LLVM_VERSION_MAJOR >= 16
 #include "llvm/IR/PassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -143,6 +147,11 @@ LLVMMemoryBufferRef LLVMGoWriteThinLTOBitcodeToMemoryBuffer(LLVMModuleRef M) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
   llvm::ModulePassManager MPM;
+#if LLVM_VERSION_MAJOR >= 23
+  // Clients can add definitions after the optimization pipeline assigned GUIDs.
+  // Fill in only missing identifiers before the summary analysis runs.
+  MPM.addPass(llvm::AssignGUIDPass());
+#endif
   MPM.addPass(llvm::ThinLTOBitcodeWriterPass(OS, nullptr));
   MPM.run(*llvm::unwrap(M), MAM);
 #else
@@ -159,6 +168,9 @@ LLVMMemoryBufferRef LLVMGoWriteFullLTOBitcodeToMemoryBuffer(
   llvm::raw_string_ostream OS(Data);
   llvm::Module *Mod = llvm::unwrap(M);
   Mod->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
+#if LLVM_VERSION_MAJOR >= 23
+  llvm::AssignGUIDPass::runOnModule(*Mod);
+#endif
   llvm::ProfileSummaryInfo PSI(*Mod);
   llvm::ModuleSummaryIndex Index =
       llvm::buildModuleSummaryIndex(*Mod, nullptr, &PSI);

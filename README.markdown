@@ -11,13 +11,15 @@ This library provides bindings to a system-installed LLVM.
 
 Currently supported:
 
-  * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 from [apt.llvm.org](http://apt.llvm.org/) on Debian/Ubuntu.
-  * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 from Homebrew on macOS.
-  * LLVM 22, 21, 20, 19, 18, 17, 16, 15 and 14 in an MSYS2 MINGW64 environment on Windows (see the setup below).
+  * LLVM 23, 22, 21, 20, 19, 18, 17, 16, 15 and 14 from [apt.llvm.org](http://apt.llvm.org/) on Debian/Ubuntu.
+  * LLVM 23, 22, 21, 20, 19, 18, 17, 16, 15 and 14 from Homebrew on macOS.
+  * LLVM 23, 22, 21, 20, 19, 18, 17, 16, 15 and 14 in an MSYS2 MINGW64 environment on Windows (see the setup below).
   * Any of the above versions with a manually built LLVM through the `byollvm` build tag. You need to set up `CFLAGS`/`LDFLAGS` etc yourself in this case.
 
-LLVM 22 is selected by default. You can select another LLVM version using a
+LLVM 23 is selected by default. You can select another LLVM version using a
 build tag, for example `-tags=llvm19` to use LLVM 19.
+When using `byollvm` with an older LLVM, also select its version tag, for
+example `-tags=byollvm,llvm22`, so version-specific APIs match the supplied headers.
 
 ## Usage
 
@@ -30,7 +32,7 @@ You can use build tags to select a LLVM version. For example, use `-tags=llvm15`
 ### Windows (MSYS2 MINGW64)
 
 The Windows bindings expect `pkg-config` metadata named after the selected LLVM
-major version, such as `llvm-22`. After installing a MinGW-compatible LLVM,
+major version, such as `llvm-23`. After installing a MinGW-compatible LLVM,
 `mingw-w64-x86_64-gcc`, and `mingw-w64-x86_64-pkgconf` in a MINGW64
 environment, generate that file from `llvm-config`:
 
@@ -39,7 +41,7 @@ environment, generate that file from `llvm-config`:
     llvm_version="$(llvm-config --version)"
     llvm_major="${llvm_version%%.*}"
     case "$llvm_major" in
-      14|15|16|17|18|19|20|21|22) ;;
+      14|15|16|17|18|19|20|21|22|23) ;;
       *) echo "unsupported LLVM version: $llvm_version" >&2; exit 1 ;;
     esac
     cflags="$(llvm-config --cflags | tr '\r\n' '  ')"

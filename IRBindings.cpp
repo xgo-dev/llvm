@@ -26,6 +26,19 @@
 
 using namespace llvm;
 
+LLVMValueRef LLVMGoConstInt(LLVMTypeRef Ty, uint64_t Value,
+                            LLVMBool SignExtend) {
+#if LLVM_VERSION_MAJOR >= 23
+  // LLVM 23's APInt constructor no longer truncates by default. Preserve the
+  // binding's modulo-2^width behavior, including uint64 encodings of negative
+  // narrow integers, and retain sign extension for types wider than 64 bits.
+  return wrap(ConstantInt::get(unwrap<IntegerType>(Ty), Value,
+                               SignExtend != 0, /*ImplicitTrunc=*/true));
+#else
+  return LLVMConstInt(Ty, Value, SignExtend);
+#endif
+}
+
 LLVMValueRef LLVMGoConstFPFromBits(LLVMTypeRef Ty, const uint64_t *Words,
                                  unsigned NumWords) {
   if (!Ty || !unwrap(Ty)->isFloatingPointTy())
@@ -141,18 +154,23 @@ LLVMValueRef LLVMGoBuildIntrinsicCall(LLVMBuilderRef B, LLVMTypeRef RetTy,
   ArrayRef<Value *> UnwrappedArgs(unwrap(Args), Count);
   SmallVector<Type *, 8> ParamTys;
   SmallVector<Type *, 8> OverloadTys;
-  SmallVector<Intrinsic::IITDescriptor, 8> Infos;
 
   ParamTys.reserve(Count);
   for (Value *Arg : UnwrappedArgs)
     ParamTys.push_back(Arg->getType());
 
   FunctionType *FTy = FunctionType::get(unwrap(RetTy), ParamTys, false);
+#if LLVM_VERSION_MAJOR >= 23
+  if (!Intrinsic::isSignatureValid(IntrinsicID, FTy, OverloadTys))
+    return nullptr;
+#else
+  SmallVector<Intrinsic::IITDescriptor, 8> Infos;
   Intrinsic::getIntrinsicInfoTableEntries(IntrinsicID, Infos);
   ArrayRef<Intrinsic::IITDescriptor> InfoRef(Infos);
   if (Intrinsic::matchIntrinsicSignature(FTy, InfoRef, OverloadTys) !=
       Intrinsic::MatchIntrinsicTypes_Match)
     return nullptr;
+#endif
 
   return wrap(unwrap(B)->CreateIntrinsic(IntrinsicID, OverloadTys,
                                          UnwrappedArgs, nullptr, Name));
