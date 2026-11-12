@@ -37,6 +37,8 @@ LLVMValueRef LLVMGoConstFPFromBits(LLVMTypeRef Ty, const uint64_t *Words,
                                  unsigned NumWords);
 unsigned LLVMGoConstFPGetBits(LLVMValueRef Val, uint64_t *Words);
 
+LLVMBool LLVMGoCopyFunctionProperties(LLVMValueRef To, LLVMValueRef From);
+
 LLVMMetadataRef LLVMConstantAsMetadata(LLVMValueRef Val);
 
 LLVMAttributeRef LLVMGoCreateConstantRangeAttribute(
