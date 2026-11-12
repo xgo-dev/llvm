@@ -9,7 +9,6 @@ jobs:
   test-macos:
     runs-on: macos-latest
     strategy:
-      fail-fast: false
       matrix:
         llvm: [14, 15, 16, 17, 18, 19, 20, 21, 22]
     steps:
@@ -34,7 +33,6 @@ jobs:
   test-linux:
     runs-on: ubuntu-22.04
     strategy:
-      fail-fast: false
       matrix:
         llvm: [14, 15, 16, 17, 18, 19, 20, 21, 22]
     steps:
